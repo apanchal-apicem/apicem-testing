@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: stg_google_ads__campaigns
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [tenant_id, campaign_id]
+    columns:
+      - name: campaign_id
+        tests:
+          - not_null
+
+  - name: stg_google_ads__insights
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [tenant_id, insight_id]
+    columns:
+      - name: insight_id
+        tests:
+          - not_null
+      - name: spend
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              config:
+                severity: warn

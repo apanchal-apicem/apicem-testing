@@ -1,0 +1,15 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9
+pydantic==2.7.4
+pydantic-settings==2.3.3
+email-validator==2.2.0
+pyjwt==2.8.0
+passlib[bcrypt]==1.7.4
+# passlib 1.7.4 is incompatible with bcrypt>=4.0 (its own internal self-test raises
+# "password cannot be longer than 72 bytes" on startup, unrelated to actual input length) --
+# pin the last pre-4.x release until passlib publishes a fix.
+bcrypt==3.2.2
+cryptography==42.0.5
+requests==2.32.3

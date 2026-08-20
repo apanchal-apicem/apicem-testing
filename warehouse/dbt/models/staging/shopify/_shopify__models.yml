@@ -1,0 +1,54 @@
+version: 2
+
+models:
+  - name: stg_shopify__orders
+    # Natural keys are only unique WITHIN a tenant, not globally -- two different Shopify
+    # stores can have overlapping order/customer/product ids. A bare `unique` test on the
+    # natural key alone doesn't reflect that and can false-fail (or false-pass) once more
+    # than one tenant's data shares this table.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [tenant_id, order_id]
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+      - name: tenant_id
+        tests:
+          - not_null
+      - name: gross_revenue
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              config:
+                severity: warn
+
+  - name: stg_shopify__order_items
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [tenant_id, order_item_id]
+    columns:
+      - name: order_item_id
+        tests:
+          - not_null
+
+  - name: stg_shopify__customers
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [tenant_id, customer_id]
+    columns:
+      - name: customer_id
+        tests:
+          - not_null
+      - name: tenant_id
+        tests:
+          - not_null
+
+  - name: stg_shopify__products
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [tenant_id, product_id]
+    columns:
+      - name: product_id
+        tests:
+          - not_null

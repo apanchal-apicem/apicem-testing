@@ -1,0 +1,6 @@
+psycopg2-binary==2.9.9
+requests==2.31.0
+cryptography==42.0.5
+dbt-core==1.7.13
+dbt-postgres==1.7.13
+python-dotenv==1.0.1

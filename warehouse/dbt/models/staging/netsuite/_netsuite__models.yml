@@ -1,0 +1,23 @@
+version: 2
+
+models:
+  - name: stg_netsuite__items
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [tenant_id, item_id]
+    columns:
+      - name: item_id
+        tests:
+          - not_null
+      - name: sku
+        tests:
+          - not_null
+
+  - name: stg_netsuite__inventory_balances
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [tenant_id, balance_id]
+    columns:
+      - name: balance_id
+        tests:
+          - not_null

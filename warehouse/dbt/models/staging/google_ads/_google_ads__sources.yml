@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: google_ads
+    schema: raw
+    tables:
+      - name: google_ads_campaigns
+      - name: google_ads_insights

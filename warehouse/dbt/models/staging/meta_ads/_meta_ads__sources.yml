@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: meta_ads
+    schema: raw
+    tables:
+      - name: meta_ads_campaigns
+      - name: meta_ads_insights

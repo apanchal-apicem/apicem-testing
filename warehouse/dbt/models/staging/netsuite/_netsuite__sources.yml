@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: netsuite
+    schema: raw
+    tables:
+      - name: netsuite_items
+      - name: netsuite_inventory_balances

@@ -1,0 +1,18 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+
+# dbt
+warehouse/dbt/dbt_packages/
+warehouse/dbt/target/
+warehouse/dbt/logs/
+warehouse/dbt/package-lock.yml
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+
+# editors/OS
+.DS_Store

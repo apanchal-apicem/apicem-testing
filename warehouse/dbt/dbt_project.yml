@@ -1,0 +1,56 @@
+name: 'apicem'
+version: '1.0.0'
+config-version: 2
+profile: 'apicem'
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  apicem:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+    marts:
+      # Tenant-scoped incremental build (doc Sec 9 update, 2026-08-19): a plain `table`
+      # rebuild drops and recreates the WHOLE table on every run, for every tenant, even
+      # when only one tenant's connection just synced -- this is what let two concurrent
+      # `dbt run`s queue against each other and wedge the database for 35+ minutes. Every
+      # mart model below is scoped by tenant_id via warehouse/dbt/macros/tenant_scope.sql's
+      # `tenant_scope_predicate()`, called explicitly in each model's WHERE clause -- YAML
+      # config alone can't express a per-row data filter, only materialization strategy.
+      # `delete+insert` deletes exactly the tenant(s) present in this run's result set, then
+      # inserts their freshly recomputed rows: a per-tenant full-refresh, not row-level
+      # incremental-merge logic, so no dedup/update-handling edge cases to get wrong.
+      +materialized: incremental
+      +incremental_strategy: delete+insert
+      +unique_key: tenant_id
+      +schema: marts
+      core:
+        # Re-applies tenant RLS after each rebuild (doc Sec 6.2). Configured here rather
+        # than inline via `config(post_hook=apply_rls())` in each model: a macro called
+        # eagerly as a config() argument renders during dbt's early config-extraction pass,
+        # before the model's custom schema is resolved, which bakes the WRONG (default)
+        # schema into any `{{ this }}` reference inside it. A YAML-configured hook is
+        # stored as an unrendered string and only rendered later, in the correct per-node
+        # compile context -- see warehouse/dbt/macros/apply_rls.sql. Post-hooks fire on
+        # every incremental run too (not just the first/full-refresh build) -- harmless,
+        # since re-applying the same RLS policy is idempotent.
+        +post-hook: "{{ apply_rls() }}"
+      marketing:
+        +post-hook: "{{ apply_rls() }}"
+      inventory:
+        +post-hook: "{{ apply_rls() }}"
+      shared:
+        # dim_date has no tenant_id (shared across tenants, doc Sec 5.2) -- deliberately
+        # excluded from the RLS post-hook above, and overridden back to a plain `table`:
+        # it doesn't fit the tenant-scoped incremental pattern at all (no tenant_id to key
+        # delete+insert on), and it's small/static/rarely rebuilt so a full table is fine.
+        +materialized: table

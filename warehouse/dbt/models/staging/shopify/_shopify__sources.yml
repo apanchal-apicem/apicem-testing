@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: shopify_orders
+        loaded_at_field: _loaded_at
+        freshness:
+          warn_after: {count: 6, period: hour}
+          error_after: {count: 24, period: hour}
+      - name: shopify_customers
+      - name: shopify_products

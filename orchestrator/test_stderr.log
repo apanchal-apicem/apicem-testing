@@ -1,0 +1,3 @@
+2026-08-19 15:24:58,952 INFO orchestrator starting: poll=30s sync_interval=15m
+2026-08-19 15:28:29,526 INFO synced connection 532348c2-7607-420a-8826-04062e86dee1: {'orders': 250, 'customers': 40, 'products': 5}
+2026-08-19 15:30:23,043 INFO synced connection 532348c2-7607-420a-8826-04062e86dee1: {'orders': 250, 'customers': 40, 'products': 5}
