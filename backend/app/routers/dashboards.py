@@ -27,6 +27,7 @@ def list_dashboards(db: Session = Depends(get_tenant_db)):
         DashboardOut(
             id=d["id"],
             title=d["title"],
+            date_note=d["date_note"],
             widgets=[DashboardWidgetOut(type=w["type"], metric=w["metric"], label=w["label"]) for w in d["widgets"]],
         )
         for d in eligible
@@ -73,4 +74,4 @@ def get_dashboard_with_values(
                 rows=result.get("rows"),
             )
         )
-    return DashboardOut(id=dashboard["id"], title=dashboard["title"], widgets=widgets)
+    return DashboardOut(id=dashboard["id"], title=dashboard["title"], date_note=dashboard["date_note"], widgets=widgets)

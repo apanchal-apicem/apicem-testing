@@ -48,3 +48,14 @@ def rate_limit(max_attempts: int = 5, window_seconds: int = 60):
             )
 
     return dependency
+
+
+def allow(key: str, max_attempts: int, window_seconds: int) -> bool:
+    """Same limiter as rate_limit() above, but callable directly from inside a request handler
+    rather than as a FastAPI dependency -- for a check whose key isn't known until partway
+    through handling the request (e.g. the Groq fallback in assistant_intents.py, which only
+    knows it's about to make a paid API call after every deterministic match has already
+    failed; a Depends()-based check runs before that's known). Returns True/False rather than
+    raising, since this is a soft "skip the optional feature" throttle, not a hard rejection of
+    the whole request."""
+    return _check(key, max_attempts, window_seconds)

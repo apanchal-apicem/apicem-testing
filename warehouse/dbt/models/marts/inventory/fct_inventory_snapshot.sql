@@ -1,4 +1,7 @@
 -- Grain: one row per product per day (doc Sec 5.2), an SCD-like snapshot fact.
+-- Every inventory metric query filters this table on (tenant_id, date_key), including
+-- the max(date_key) subquery metric_registry.py uses to find "as of" the selected range.
+{{ config(indexes=[{'columns': ['tenant_id', 'date_key']}]) }}
 select
     ib.tenant_id,
     ib.snapshot_date                       as date_key,

@@ -27,13 +27,13 @@ export function ForgotPasswordPage() {
       <div className="auth-brand-panel">
         <div className="brand">
           <div className="brand-mark" />
-          <div className="brand-name">Apicem</div>
+          <div className="brand-name">Apicem Engine</div>
         </div>
         <div className="auth-brand-copy">
           <h2>Forgot your password?</h2>
           <p>Enter your email and we'll send you a link to reset it.</p>
         </div>
-        <div className="auth-brand-foot">Apicem Analytics Platform</div>
+        <div className="auth-brand-foot">Apicem Engine Analytics Platform</div>
       </div>
       <div className="auth-form-panel">
         <div className="auth-card">

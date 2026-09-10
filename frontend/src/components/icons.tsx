@@ -269,3 +269,86 @@ export function IconDatabaseZap({ size }: IconProps) {
     size
   );
 }
+
+export function IconSun({ size }: IconProps) {
+  return base(
+    <>
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M12 2.5v3M12 18.5v3M4.4 4.4l2.1 2.1M17.5 17.5l2.1 2.1M2.5 12h3M18.5 12h3M4.4 19.6l2.1-2.1M17.5 6.5l2.1-2.1" />
+    </>,
+    size
+  );
+}
+
+export function IconMoon({ size }: IconProps) {
+  return base(<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z" />, size);
+}
+
+export function IconDownload({ size }: IconProps) {
+  return base(
+    <>
+      <path d="M12 3.5v11.5M7.5 10.5 12 15l4.5-4.5" />
+      <path d="M4.5 16.5v2.5a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-2.5" />
+    </>,
+    size
+  );
+}
+
+export function IconFileText({ size }: IconProps) {
+  return base(
+    <>
+      <path d="M7 3.5h7l3.5 3.5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1Z" />
+      <path d="M14 3.5V7h3.5" />
+      <line x1="8.5" y1="12" x2="15.5" y2="12" />
+      <line x1="8.5" y1="15.5" x2="15.5" y2="15.5" />
+      <line x1="8.5" y1="19" x2="12.5" y2="19" />
+    </>,
+    size
+  );
+}
+
+export function IconMenu({ size }: IconProps) {
+  return base(
+    <>
+      <line x1="3.5" y1="6.5" x2="20.5" y2="6.5" />
+      <line x1="3.5" y1="12" x2="20.5" y2="12" />
+      <line x1="3.5" y1="17.5" x2="20.5" y2="17.5" />
+    </>,
+    size
+  );
+}
+
+export function IconInfo({ size }: IconProps) {
+  return base(
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <line x1="12" y1="11" x2="12" y2="16" />
+      <line x1="12" y1="7.5" x2="12" y2="7.6" />
+    </>,
+    size
+  );
+}
+
+export function IconPlay({ size }: IconProps) {
+  return base(<path d="M6.5 4.5v15l13-7.5-13-7.5Z" />, size);
+}
+
+export function IconShield({ size }: IconProps) {
+  return base(
+    <>
+      <path d="M12 3 4.5 6v6c0 5 3.5 7.5 7.5 9 4-1.5 7.5-4 7.5-9V6L12 3Z" />
+      <polyline points="9 12 11.2 14.2 15.5 9.5" />
+    </>,
+    size
+  );
+}
+
+export function IconX({ size }: IconProps) {
+  return base(
+    <>
+      <line x1="5" y1="5" x2="19" y2="19" />
+      <line x1="19" y1="5" x2="5" y2="19" />
+    </>,
+    size
+  );
+}

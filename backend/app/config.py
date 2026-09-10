@@ -28,11 +28,11 @@ class Settings(BaseSettings):
 
     password_reset_token_expires_minutes: int = 30
 
-    # Fully self-hosted analytics assistant (doc Sec 9 update, 2026-08-20) -- Ollama's
-    # local REST server, not a third-party API. Model is swappable without a code change;
-    # start with qwen2.5:7b and drop to a smaller one if CPU-only latency is too slow.
-    ollama_host: str = "http://localhost:11434"
-    ollama_model: str = "qwen2.5:7b"
+    # /auth/demo issues a real token for this fixed, pre-seeded account with no credentials
+    # required -- the "View live demo" button on the public homepage. Its role is always
+    # "viewer" (see warehouse seeding), so require_role("owner", "admin") already blocks it
+    # from touching connections/team/workspace settings -- no separate read-only mode needed.
+    demo_user_email: str = "demo@apicem-demo.com"
 
     # Blank host = log the email to the backend's own console instead of sending (dev
     # fallback -- see .env.example). Fill in once a real provider is configured.
@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_from_email: str = "onboarding@apicem.local"
+
+    # Blank = the Groq last-resort intent classifier in assistant_intents.py/groq_fallback.py
+    # is entirely disabled -- no outbound call is ever attempted. It only ever CLASSIFIES a
+    # question into one of this app's own already-defined metric/date keys (validated against
+    # them before use); it never sees or states a number, so keeping this optional doesn't
+    # weaken the "no LLM ever answers directly" guarantee the rest of the assistant relies on.
+    groq_api_key: str = ""
+    # Confirmed available via Groq's /v1/models as of 2026-09-07 -- Groq's catalog has shifted
+    # entirely away from Llama 3.x models since; check `GET /v1/models` again if this 404s.
+    groq_model: str = "openai/gpt-oss-20b"
 
     class Config:
         env_file = _REPO_ROOT_ENV

@@ -1,4 +1,6 @@
 -- Grain: one row per campaign per day (doc Sec 5.2).
+-- Every ad-spend metric query filters this table on (tenant_id, date_key).
+{{ config(indexes=[{'columns': ['tenant_id', 'date_key']}]) }}
 select
     {{ dbt_utils.generate_surrogate_key(['ai.tenant_id', 'ai.source_system', 'ai.source_campaign_id', 'ai.date_key']) }} as spend_key,
     ai.tenant_id,

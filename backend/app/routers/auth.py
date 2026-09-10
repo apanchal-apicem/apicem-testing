@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..db import get_db, set_tenant
 from ..email import send_email
 from ..rate_limit import rate_limit
@@ -68,12 +69,28 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     return TokenResponse(access_token=token)
 
 
+@router.post("/demo", response_model=TokenResponse, dependencies=[Depends(rate_limit(20, 60))])
+def demo_login(db: Session = Depends(get_db)):
+    """No credentials, by design -- the homepage's "View live demo" button. Always logs into
+    the same pre-seeded, viewer-role account, so a demo visitor can look around but never
+    rename the workspace, touch connections, or manage the team (require_role("owner",
+    "admin") on those routes already refuses a viewer)."""
+    row = db.execute(text("SELECT * FROM app.login_lookup(:email)"), {"email": settings.demo_user_email}).first()
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The live demo isn't set up on this server yet.",
+        )
+    token = create_access_token(user_id=str(row.user_id), tenant_id=str(row.tenant_id), role=row.role, is_demo=True)
+    return TokenResponse(access_token=token)
+
+
 @router.get("/me", response_model=MeResponse)
 def me(current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     set_tenant(db, current_user.tenant_id)
     row = db.execute(
         text(
-            """SELECT u.email, u.role, t.name AS tenant_name
+            """SELECT u.email, u.role, t.name AS tenant_name, t.logo_url AS tenant_logo_url
                FROM app.users u JOIN app.tenants t ON t.tenant_id = u.tenant_id
                WHERE u.user_id = :user_id"""
         ),
@@ -85,6 +102,8 @@ def me(current_user: CurrentUser = Depends(get_current_user), db: Session = Depe
         email=row.email,
         role=row.role,
         tenant_name=row.tenant_name,
+        tenant_logo_url=row.tenant_logo_url,
+        is_demo=current_user.is_demo,
     )
 
 
@@ -122,7 +141,7 @@ def request_password_reset(payload: RequestPasswordResetRequest, db: Session = D
         reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
         send_email(
             payload.email,
-            "Reset your Apicem password",
+            "Reset your Apicem Engine password",
             f"Click the link below to reset your password. This link expires in 30 minutes.\n\n{reset_link}",
         )
     return {"status": "if that email is registered, a reset link has been sent"}

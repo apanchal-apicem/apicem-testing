@@ -32,13 +32,13 @@ export function ResetPasswordPage() {
       <div className="auth-brand-panel">
         <div className="brand">
           <div className="brand-mark" />
-          <div className="brand-name">Apicem</div>
+          <div className="brand-name">Apicem Engine</div>
         </div>
         <div className="auth-brand-copy">
           <h2>Set a new password</h2>
           <p>Choose a new password to get back into your workspace.</p>
         </div>
-        <div className="auth-brand-foot">Apicem Analytics Platform</div>
+        <div className="auth-brand-foot">Apicem Engine Analytics Platform</div>
       </div>
       <div className="auth-form-panel">
         <div className="auth-card">

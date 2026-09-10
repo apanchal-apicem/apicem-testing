@@ -1,5 +1,9 @@
 -- Grain: one row per tenant per day per channel. Rolled-up mart the dashboards query
 -- directly so reads stay sub-second against pre-aggregated data (doc Sec 1.3, 5.2).
+-- Every metric_registry.py query against this table filters on exactly (tenant_id,
+-- date_key) -- a composite index matching that predicate, not two separate single-column
+-- ones (doc's own "index the predicate you actually run" rule).
+{{ config(indexes=[{'columns': ['tenant_id', 'date_key']}]) }}
 with first_order as (
     select tenant_id, customer_key, min(order_date_key) as first_order_date
     from {{ ref('fct_orders') }}

@@ -15,6 +15,7 @@ DASHBOARDS = [
         "id": "executive_overview",
         "title": "Executive Overview",
         "required_capabilities": {"ecommerce"},
+        "date_note": "Dates reflect the order date -- a sale counts on the day it was placed, within the selected range.",
         "widgets": [
             {"type": "kpi", "metric": "gross_revenue", "label": "Gross Revenue"},
             {"type": "kpi", "metric": "net_revenue", "label": "Net Revenue"},
@@ -31,6 +32,7 @@ DASHBOARDS = [
         "id": "revenue",
         "title": "Revenue",
         "required_capabilities": {"ecommerce"},
+        "date_note": "Dates reflect the order date -- a sale counts on the day it was placed, within the selected range.",
         "widgets": [
             {"type": "kpi", "metric": "gross_revenue", "label": "Gross Revenue"},
             {"type": "kpi", "metric": "net_revenue", "label": "Net Revenue"},
@@ -45,6 +47,7 @@ DASHBOARDS = [
         "id": "product_performance",
         "title": "Product Performance",
         "required_capabilities": {"ecommerce"},
+        "date_note": "Dates reflect the order date -- a sale counts on the day it was placed, within the selected range.",
         "widgets": [
             {"type": "table", "metric": "top_products", "label": "Top Products by Revenue"},
         ],
@@ -53,6 +56,7 @@ DASHBOARDS = [
         "id": "marketing_performance",
         "title": "Marketing Performance",
         "required_capabilities": {"advertising"},
+        "date_note": "Dates reflect the ad platform's own report date -- spend and clicks count on the day the platform reported them, which can differ from order date.",
         "widgets": [
             {"type": "kpi", "metric": "total_ad_spend", "label": "Total Ad Spend"},
             {"type": "kpi", "metric": "total_conversions", "label": "Conversions"},
@@ -67,6 +71,7 @@ DASHBOARDS = [
         "id": "advertising_roi",
         "title": "Advertising ROI",
         "required_capabilities": {"advertising"},
+        "date_note": "Dates reflect the ad platform's own report date -- spend and clicks count on the day the platform reported them, which can differ from order date.",
         "widgets": [
             {"type": "kpi", "metric": "blended_roas", "label": "Blended ROAS"},
             {"type": "kpi", "metric": "blended_cpa", "label": "Blended CPA"},
@@ -78,6 +83,7 @@ DASHBOARDS = [
         "id": "inventory",
         "title": "Inventory",
         "required_capabilities": {"inventory"},
+        "date_note": "Inventory numbers are a snapshot as of the end of the selected range, not summed across it -- moving the start date won't change these values.",
         "widgets": [
             {"type": "kpi", "metric": "total_inventory_value", "label": "Inventory Value"},
             {"type": "kpi", "metric": "total_units_on_hand", "label": "Units on Hand"},

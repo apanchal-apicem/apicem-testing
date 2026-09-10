@@ -43,6 +43,19 @@ def _reset_rate_limits():
     yield
 
 
+@pytest.fixture(autouse=True)
+def _disable_real_groq_calls(monkeypatch):
+    """Tests must NEVER depend on whatever GROQ_API_KEY happens to be in a developer's local
+    .env -- forcing it blank here means the Groq fallback branch in ask_assistant() is
+    unreachable during the whole suite regardless, so "and yesterday?" with no context, e.g.,
+    reliably exercises the deterministic honest-rejection path being tested, not a real network
+    call. A test that specifically wants to exercise the Groq branch monkeypatches
+    settings.groq_api_key back to a fake value AND mocks assistant_intents.classify_via_groq
+    (never the real network) -- see test_assistant_groq_fallback.py."""
+    monkeypatch.setattr(settings, "groq_api_key", "")
+    yield
+
+
 @pytest.fixture(scope="session")
 def owner_db_conn():
     """Direct connection as the table-owner role, for setup/teardown/assertions that must

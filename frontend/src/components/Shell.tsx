@@ -1,17 +1,23 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { assetUrl } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import {
   IconDatabaseZap,
   IconGrid,
   IconLogOut,
   IconMegaphone,
+  IconMenu,
   IconMessageCircle,
+  IconMoon,
   IconPlug,
   IconSettings,
   IconShoppingBag,
+  IconSun,
   IconTarget,
   IconTrendingUp,
   IconUsers,
+  IconX,
 } from "./icons";
 
 function initials(name?: string, email?: string) {
@@ -30,20 +36,61 @@ function NavItem({ to, icon, label }: { to: string; icon: React.ReactNode; label
   );
 }
 
+function currentTheme(): "light" | "dark" {
+  const stored = localStorage.getItem("theme");
+  if (stored === "light" || stored === "dark") return stored;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function ThemeToggle() {
+  const [theme, setTheme] = useState<"light" | "dark">(currentTheme);
+
+  function toggle() {
+    const next = theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem("theme", next);
+    setTheme(next);
+  }
+
+  return (
+    <button className="secondary theme-toggle" style={{ width: "100%" }} onClick={toggle}>
+      {theme === "dark" ? <IconSun size={15} /> : <IconMoon size={15} />}
+      {theme === "dark" ? "Light mode" : "Dark mode"}
+    </button>
+  );
+}
+
 export function Shell() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const [navOpen, setNavOpen] = useState(false);
+
+  // An off-canvas drawer left open across a navigation would sit on top of the page the
+  // user just went to -- close it every time the route changes, same as any mobile nav.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="app-shell">
-      <div className="sidebar">
+      {navOpen && <div className="sidebar-backdrop" onClick={() => setNavOpen(false)} />}
+
+      <div className={`sidebar ${navOpen ? "open" : ""}`}>
         <div className="brand">
-          <div className="brand-mark">
-            <IconTrendingUp size={15} />
-          </div>
-          <div className="brand-name">Apicem</div>
+          {user?.tenant_logo_url ? (
+            <img src={assetUrl(user.tenant_logo_url)} alt="" className="brand-mark brand-mark-logo" />
+          ) : (
+            <div className="brand-mark">
+              <IconTrendingUp size={15} />
+            </div>
+          )}
+          <div className="brand-name">Apicem Engine</div>
+          <button className="nav-close" aria-label="Close navigation" onClick={() => setNavOpen(false)}>
+            <IconX size={18} />
+          </button>
         </div>
 
-        <NavItem to="/assistant" icon={<IconMessageCircle size={16} />} label="Ask Apicem" />
+        <NavItem to="/assistant" icon={<IconMessageCircle size={16} />} label="Ask Apicem Engine" />
 
         <div className="nav-section-label">Overview</div>
         <NavItem to="/dashboards/executive_overview" icon={<IconGrid size={16} />} label="Executive Overview" />
@@ -65,6 +112,7 @@ export function Shell() {
         <NavItem to="/account" icon={<IconSettings size={16} />} label="Account" />
 
         <div className="sidebar-footer">
+          <ThemeToggle />
           <NavLink to="/account" className="user-row" style={{ textDecoration: "none", color: "inherit" }}>
             <div className="avatar">{initials(user?.tenant_name, user?.email)}</div>
             <div className="user-row-text">
@@ -81,6 +129,13 @@ export function Shell() {
         </div>
       </div>
       <div className="main-content">
+        <button
+          className="nav-hamburger"
+          aria-label="Open navigation"
+          onClick={() => setNavOpen(true)}
+        >
+          <IconMenu size={20} />
+        </button>
         <Outlet />
       </div>
     </div>

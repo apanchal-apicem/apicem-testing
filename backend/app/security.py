@@ -21,9 +21,9 @@ def verify_password(password: str, hashed: str) -> bool:
     return pwd_context.verify(password, hashed)
 
 
-def create_access_token(user_id: str, tenant_id: str, role: str) -> str:
+def create_access_token(user_id: str, tenant_id: str, role: str, is_demo: bool = False) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expires_minutes)
-    payload = {"sub": user_id, "tenant_id": tenant_id, "role": role, "exp": expires_at}
+    payload = {"sub": user_id, "tenant_id": tenant_id, "role": role, "is_demo": is_demo, "exp": expires_at}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
@@ -47,10 +47,11 @@ def verify_password_reset_token(token: str) -> str:
 
 
 class CurrentUser:
-    def __init__(self, user_id: str, tenant_id: str, role: str):
+    def __init__(self, user_id: str, tenant_id: str, role: str, is_demo: bool = False):
         self.user_id = user_id
         self.tenant_id = tenant_id
         self.role = role
+        self.is_demo = is_demo
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> CurrentUser:
@@ -62,7 +63,12 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> CurrentUser:
     # reject it cleanly here rather than crashing below with a raw KeyError.
     if "tenant_id" not in payload or "role" not in payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
-    return CurrentUser(user_id=payload["sub"], tenant_id=payload["tenant_id"], role=payload["role"])
+    return CurrentUser(
+        user_id=payload["sub"],
+        tenant_id=payload["tenant_id"],
+        role=payload["role"],
+        is_demo=payload.get("is_demo", False),
+    )
 
 
 def get_tenant_db(

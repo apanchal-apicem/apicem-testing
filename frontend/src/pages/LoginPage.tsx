@@ -29,13 +29,13 @@ export function LoginPage() {
       <div className="auth-brand-panel">
         <div className="brand">
           <div className="brand-mark" />
-          <div className="brand-name">Apicem</div>
+          <div className="brand-name">Apicem Engine</div>
         </div>
         <div className="auth-brand-copy">
           <h2>All your revenue, ad spend, and inventory data — one place, one number for each.</h2>
-          <p>Connect Shopify and your other tools once. Apicem keeps the metrics in sync so every dashboard agrees.</p>
+          <p>Connect Shopify and your other tools once. Apicem Engine keeps the metrics in sync so every dashboard agrees.</p>
         </div>
-        <div className="auth-brand-foot">Apicem Analytics Platform</div>
+        <div className="auth-brand-foot">Apicem Engine Analytics Platform</div>
       </div>
       <div className="auth-form-panel">
         <div className="auth-card">

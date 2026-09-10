@@ -63,6 +63,36 @@
   }
 }
 
+/* Explicit "dark" choice from the theme toggle -- unguarded by the media query above, so it
+   wins even when the OS itself prefers light (the media-query block alone only ever covers
+   the reverse case, an explicit light choice beating an OS dark preference). */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --surface-2: #232322;
+  --page-plane: #0d0d0d;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --brand: #3987e5;
+  --brand-hover: #5ba0ef;
+  --brand-tint: rgba(57, 135, 229, 0.16);
+  --status-good: #0ca30c;
+  --status-good-tint: rgba(12, 163, 12, 0.18);
+  --status-warning: #fab219;
+  --status-warning-tint: rgba(250, 178, 25, 0.16);
+  --status-critical: #e66767;
+  --status-critical-tint: rgba(230, 103, 103, 0.16);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -73,7 +103,7 @@ body {
   color: var(--text-primary);
   /* Inter loaded via index.html's Google Fonts link; same system fallback stack as before
      if that request is ever blocked (offline, restrictive network), so nothing breaks. */
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Afacad Flux", system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "cv11", "ss01";
 }
@@ -127,6 +157,14 @@ h3 {
 
 .brand-mark svg {
   stroke-width: 2.25;
+}
+
+.brand-mark-logo {
+  /* Overrides the gradient background with a neutral surface -- an uploaded logo with
+     transparent areas would otherwise show the gradient bleeding through. */
+  background: var(--surface-2);
+  object-fit: contain;
+  padding: 2px;
 }
 
 .brand-name {
@@ -185,6 +223,38 @@ h3 {
   border-top: 1px solid var(--border);
 }
 
+.theme-toggle {
+  margin-bottom: 10px;
+}
+
+.nav-hamburger {
+  display: none;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+
+.nav-close {
+  display: none;
+  margin-left: auto;
+  padding: 4px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
 .user-row {
   display: flex;
   align-items: center;
@@ -227,9 +297,13 @@ h3 {
 }
 
 .main-content {
+  /* Used to cap at 1120px, which left a growing blank gutter on any monitor wider than
+     ~1350px (sidebar + cap) -- flex:1 with no cap fills the sidebar's remaining space on
+     any screen size, with a generous ceiling only to stop truly ultra-wide (3000px+)
+     monitors from stretching KPI tiles/charts absurdly far apart. */
   flex: 1;
   padding: 26px 36px 48px;
-  max-width: 1120px;
+  max-width: 1900px;
   min-width: 0;
 }
 
@@ -240,6 +314,17 @@ h3 {
   margin-bottom: 22px;
   gap: 16px;
   flex-wrap: wrap;
+}
+
+.dashboard-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dashboard-header-actions button.secondary {
+  padding: 9px 12px;
 }
 
 .page-title {
@@ -359,11 +444,70 @@ h3 {
   box-shadow: var(--shadow-sm);
 }
 
+.chart-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
 .chart-card .chart-title {
   font-size: 13.5px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 10px;
+}
+
+.chart-card-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.table-filter-toggle {
+  display: inline-flex;
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.table-filter-toggle button {
+  border: none;
+  background: none;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.table-filter-toggle button.active {
+  background: var(--surface-1);
+  color: var(--brand);
+  box-shadow: var(--shadow-sm);
+}
+
+.chart-card-csv {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-1);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.chart-card-csv:hover {
+  background: var(--surface-2);
+  color: var(--text-secondary);
 }
 
 .legend {
@@ -384,6 +528,44 @@ h3 {
 
 /* ---------- Date range selector ---------- */
 
+.info-note {
+  position: relative;
+}
+
+.info-note-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.info-note-trigger:hover {
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.info-note-panel {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  width: 260px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  z-index: 20;
+}
+
 .date-range {
   position: relative;
 }
@@ -399,6 +581,7 @@ h3 {
   color: var(--text-primary);
   font-size: 12.5px;
   font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -434,6 +617,17 @@ h3 {
 
 .date-range-option:hover {
   background: var(--surface-2);
+}
+
+.date-range-option-label {
+  display: block;
+}
+
+.date-range-option-dates {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
 }
 
 .date-range-divider {
@@ -483,6 +677,38 @@ h3 {
   padding: 18px 20px;
   margin-bottom: 16px;
   box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Workspace logo ---------- */
+
+.workspace-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.workspace-logo-preview {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  object-fit: contain;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.workspace-logo-placeholder {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* ---------- Assistant chat ---------- */
@@ -559,6 +785,72 @@ h3 {
 .chat-input-row button.primary {
   width: auto;
   padding: 10px 18px;
+}
+
+.chat-results {
+  margin: -4px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-results .chat-result-card {
+  margin-bottom: 0;
+}
+
+.chat-result-kpi {
+  max-width: 220px;
+}
+
+.capability-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.capability-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.capability-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.capability-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.capability-pill:hover {
+  border-color: var(--brand);
+  background: var(--brand-tint);
+  color: var(--brand);
+}
+
+.capability-kind {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .panel-header {
@@ -852,7 +1144,8 @@ button {
   font-family: inherit;
 }
 
-button.primary {
+button.primary,
+a.primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -866,10 +1159,12 @@ button.primary {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  text-decoration: none;
   transition: background 0.12s ease;
 }
 
-button.primary:hover:not(:disabled) {
+button.primary:hover:not(:disabled),
+a.primary:hover {
   background: var(--brand-hover);
 }
 
@@ -878,7 +1173,8 @@ button.primary:disabled {
   cursor: default;
 }
 
-button.secondary {
+button.secondary,
+a.secondary {
   padding: 7px 13px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -887,13 +1183,15 @@ button.secondary {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   transition: background 0.12s ease;
 }
 
-button.secondary:hover:not(:disabled) {
+button.secondary:hover:not(:disabled),
+a.secondary:hover {
   background: var(--surface-2);
 }
 
@@ -985,6 +1283,451 @@ button.secondary:disabled {
   margin: 0 0 4px;
 }
 
+/* ---------- Marketing homepage ---------- */
+
+.marketing-page {
+  background: var(--page-plane);
+  min-height: 100vh;
+}
+
+/* Global, not marketing-scoped: the page has no per-section scroll container, so the
+   #features/#how-it-works anchor links only animate if this is set on the actual scrolling
+   element (the document itself). */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+.marketing-nav {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+}
+
+.marketing-nav-inner {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.marketing-nav-links {
+  display: flex;
+  gap: 22px;
+  flex: 1;
+}
+
+.marketing-nav-links a {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.marketing-nav-links a:hover {
+  color: var(--text-primary);
+}
+
+.marketing-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.marketing-nav-actions .primary,
+.marketing-nav-actions .secondary {
+  width: auto;
+  padding: 8px 16px;
+}
+
+.marketing-hero {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 64px 32px 80px;
+  display: grid;
+  grid-template-columns: minmax(0, 460px) 1fr;
+  gap: 56px;
+  align-items: center;
+}
+
+.marketing-eyebrow {
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--brand);
+  background: var(--brand-tint);
+  padding: 5px 12px;
+  border-radius: 999px;
+  margin-bottom: 18px;
+}
+
+.marketing-hero-copy h1 {
+  font-size: clamp(32px, 4vw, 44px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin: 0 0 18px;
+}
+
+.marketing-hero-copy p {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0 0 28px;
+  max-width: 46ch;
+}
+
+.marketing-hero-ctas {
+  display: flex;
+  gap: 12px;
+}
+
+.marketing-hero-ctas .primary,
+.marketing-hero-ctas .secondary {
+  width: auto;
+  padding: 11px 20px;
+  font-size: 14.5px;
+}
+
+.marketing-hero-visual {
+  min-width: 0;
+}
+
+.marketing-mock-window {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.marketing-mock-titlebar {
+  display: flex;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.marketing-mock-titlebar span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.marketing-mock-body {
+  padding: 20px;
+}
+
+.marketing-mock-body .kpi-row {
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 16px;
+}
+
+.marketing-mock-body .chart-card {
+  margin-bottom: 0;
+  box-shadow: none;
+}
+
+.marketing-connects {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 32px 56px;
+  text-align: center;
+}
+
+.marketing-connects-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 0 0 18px;
+}
+
+.marketing-connects-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.marketing-connects-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-1);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.marketing-features {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 56px 32px;
+  border-top: 1px solid var(--border);
+}
+
+#features,
+#how-it-works {
+  /* Clears the sticky nav's own height -- without this, jumping to #features/#how-it-works
+     lands the heading partially hidden behind the nav bar instead of just below it. */
+  scroll-margin-top: 76px;
+}
+
+.marketing-features h2,
+.marketing-steps h2,
+.marketing-privacy h2,
+.marketing-cta h2 {
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-align: center;
+  margin: 0 0 40px;
+  max-width: 32ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.marketing-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.marketing-feature-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 24px 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.marketing-feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-tint);
+  color: var(--brand);
+  margin-bottom: 14px;
+}
+
+.marketing-feature-card h3 {
+  font-size: 16px;
+  font-weight: 650;
+  margin: 0 0 8px;
+}
+
+.marketing-feature-card p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.marketing-steps {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 56px 32px;
+  border-top: 1px solid var(--border);
+}
+
+.marketing-steps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.marketing-steps-list li {
+  position: relative;
+  padding-top: 34px;
+  border-top: 2px solid var(--border-strong);
+}
+
+.marketing-step-num {
+  position: absolute;
+  top: -14px;
+  left: 0;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand);
+  background: var(--page-plane);
+  padding-right: 8px;
+}
+
+.marketing-steps-list h3 {
+  font-size: 15.5px;
+  font-weight: 650;
+  margin: 0 0 6px;
+}
+
+.marketing-steps-list p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.marketing-privacy {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 48px 32px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+}
+
+.marketing-privacy-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: var(--brand-tint);
+  color: var(--brand);
+}
+
+.marketing-privacy h2 {
+  text-align: left;
+  margin: 0 0 8px;
+  max-width: none;
+  margin-left: 0;
+}
+
+.marketing-privacy p {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 62ch;
+}
+
+.marketing-cta {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 64px 32px 72px;
+  text-align: center;
+  border-top: 1px solid var(--border);
+}
+
+.marketing-cta p {
+  font-size: 14.5px;
+  color: var(--text-secondary);
+  margin: 0 0 24px;
+}
+
+.marketing-cta .primary {
+  width: auto;
+  display: inline-flex;
+  padding: 12px 24px;
+  font-size: 15px;
+}
+
+.marketing-footer {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 28px 32px 40px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.marketing-footer-links {
+  display: flex;
+  gap: 18px;
+}
+
+.marketing-footer-links a {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.marketing-footer-links a:hover {
+  color: var(--text-primary);
+}
+
+@media (max-width: 900px) {
+  .marketing-nav-links {
+    display: none;
+  }
+
+  .marketing-hero {
+    grid-template-columns: 1fr;
+    padding: 40px 20px 56px;
+    gap: 36px;
+  }
+
+  .marketing-feature-grid,
+  .marketing-steps-list {
+    grid-template-columns: 1fr;
+  }
+
+  .marketing-mock-body .kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .marketing-privacy {
+    flex-direction: column;
+  }
+
+  .marketing-features,
+  .marketing-steps,
+  .marketing-privacy,
+  .marketing-cta,
+  .marketing-connects {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .marketing-nav-inner {
+    padding: 12px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .marketing-mock-body .kpi-row {
+    grid-template-columns: 1fr;
+  }
+
+  .marketing-hero-ctas {
+    flex-direction: column;
+  }
+
+  .marketing-hero-ctas .primary,
+  .marketing-hero-ctas .secondary {
+    width: 100%;
+  }
+}
+
 .auth-card .auth-subtitle {
   font-size: 13px;
   color: var(--text-muted);
@@ -997,5 +1740,107 @@ button.secondary:disabled {
   }
   .auth-brand-panel {
     display: none;
+  }
+}
+
+/* ---------- Phone / tablet ---------- */
+/* .kpi-row's auto-fit grid, MetricTable's overflow-x wrapper, and TrendChart's
+   ResponsiveContainer already reflow on their own -- the one thing the layout actually
+   needs below this width is the sidebar becoming an off-canvas drawer instead of a fixed
+   column that leaves almost nothing for content. */
+@media (max-width: 900px) {
+  .nav-hamburger {
+    display: flex;
+  }
+
+  .nav-close {
+    display: flex;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: var(--shadow-md);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 40;
+  }
+
+  .main-content {
+    max-width: none;
+    padding: 20px 18px 40px;
+  }
+
+  .chat-bubble {
+    max-width: 88%;
+  }
+
+  .workspace-logo-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-tile .value {
+    font-size: 24px;
+  }
+
+  .main-content {
+    padding: 16px 14px 32px;
+  }
+
+  .page-header {
+    margin-bottom: 16px;
+  }
+}
+
+/* ---------- Print (dashboard PDF export via window.print()) ---------- */
+@media print {
+  :root {
+    --surface-1: #ffffff;
+    --surface-2: #f4f4f2;
+    --page-plane: #ffffff;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #6b6a64;
+    --border: rgba(11, 11, 11, 0.14);
+    --border-strong: rgba(11, 11, 11, 0.2);
+    --shadow-sm: none;
+    --shadow-md: none;
+  }
+
+  .sidebar,
+  .nav-hamburger,
+  .sidebar-backdrop,
+  .dashboard-header-actions,
+  .chart-card-csv,
+  .table-filter-toggle {
+    display: none !important;
+  }
+
+  .main-content {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .kpi-tile,
+  .chart-card {
+    break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #ddd;
   }
 }

@@ -34,7 +34,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 #    owned by `apicem` -- see warehouse/sql/000_create_app_role.sh's header comment for the
 #    exact psql commands (it's written for docker-entrypoint-initdb.d, but every statement
 #    in 000-007 runs fine by hand against a plain local Postgres too).
-# 2) run warehouse/sql/001 through 007 in order against that database as the `apicem` role.
+# 2) run warehouse/sql/001 through 010 in order against that database as the `apicem` role.
 ```
 
 Terminal 1 — backend:
@@ -90,6 +90,15 @@ for containers regardless of what's in `.env`. This path is less exercised right
 local one above -- the architecture doc's original target, but local-first was the deliberate
 choice while the product itself was still changing quickly.
 
+The frontend container serves a real production build (`vite build`, served by nginx) rather
+than the dev server -- no hot-reload if you're iterating against it in Docker (use the local
+path above for that), but it's what an actual deploy would run. Each service's Dockerfile is
+independently buildable/deployable on its own too, not just via this compose file, e.g.:
+```bash
+docker build -t apicem-backend ./backend
+docker build -t apicem-frontend --build-arg VITE_API_BASE_URL=https://api.example.com ./frontend
+```
+
 ## Running the test suite
 
 ```bash
@@ -103,7 +112,41 @@ been in RLS/grants/SQL, which a mocked DB layer would never catch. Every test cr
 disposable, clearly-tagged tenant and deletes it in teardown; nothing here touches real data.
 `tests/test_rls_isolation.py` is the single most important file in the suite: it proves one
 tenant's token can never see another tenant's rows, which is the property this entire
-multi-tenancy model depends on.
+multi-tenancy model depends on. `tests/test_assistant_intents.py` and
+`tests/test_connector_mock_data.py` are pure-logic unit tests (no DB) -- date-range math and
+mock-data generation, respectively -- guarding against exactly the class of bug that shipped
+twice in one afternoon: a silently-wrong number with no error anywhere (see the "last N days"
+off-by-one and the Shopify gross/net revenue mixup, both now pinned by these tests).
+
+```bash
+cd frontend
+npm install   # first time only
+npm test
+```
+
+Vitest, pure-logic only (no component rendering yet) -- `src/components/DateRangeSelector.test.ts`
+covers the exact date-arithmetic that caused the dashboard/chat mismatch above, and
+`src/lib/csv.test.ts` covers CSV-escaping correctness for exported data.
+
+`tests/test_groq_fallback.py` and `tests/test_assistant_api.py`'s Groq-related tests never hit
+the real network -- an autouse fixture in `conftest.py` blanks `GROQ_API_KEY` for the whole
+suite regardless of what's in your local `.env`, and every Groq-path test mocks `httpx`/
+`classify_via_groq` directly instead.
+
+## Ask Apicem Engine's optional Groq fallback
+
+The assistant (`backend/app/assistant_intents.py`) is deterministic by design -- see that
+file's own module docstring for why (it's a deliberate reversal of an earlier Ollama-based
+version that occasionally contradicted itself). `GROQ_API_KEY` (blank by default, see
+`.env.example`) adds an optional last resort: when the deterministic matcher truly can't
+recognize a question, Groq is asked to CLASSIFY it into one of the app's own already-defined
+metric/date keys -- never to compute or state a number, never to phrase the reply. Its answer
+is validated against those closed sets before use (`backend/app/groq_fallback.py`); anything
+that doesn't validate, or any API failure, falls back to the same honest rejection every other
+unrecognized question gets. Replies from this path are prefixed ("Not 100% sure, but here's my
+best guess: ...") so it's never mistaken for a deterministic answer. Get a free key at
+https://console.groq.com/keys — check `GET https://api.groq.com/openai/v1/models` with it if
+`GROQ_MODEL`'s default ever 404s (Groq's model catalog changes over time).
 
 ## Two-role RLS setup
 
@@ -175,9 +218,15 @@ until the product itself is feature-complete -- see below for what's already clo
   cycle instead of crashing the whole process.
 - ~~Every terminal restart needed 7 manually-retyped env vars~~ → `.env` is auto-loaded by
   both the backend and the orchestrator now.
+- ~~Frontend had zero test coverage/framework~~ → `frontend/`, Vitest, run via `npm test`
+  (see above). Still only pure-logic coverage, no component rendering tests yet.
+- ~~Connector data-generation logic (`connectors/*/mock_data.py`) was untested~~ →
+  `backend/tests/test_connector_mock_data.py` covers determinism and financial-field
+  invariants for all four connectors. The real-credential API-call paths themselves
+  (`connectors/*/sync.py`'s live branch, `orchestrator/scheduler.py`) remain untested.
 
 **Still open, needed soon (not blocking to keep building locally):**
 - Error tracking (Sentry or similar) -- pipeline/API failures are currently only visible if
   someone happens to look at a terminal or the in-app data-health panel.
-- CI (needs a git remote first -- this repo has no git history yet).
+- CI (needs a git remote first -- this repo has only a single local "Initial commit" so far, no remote).
 - SOC 2 groundwork, audit logging, usage-based plan limits, guided onboarding polish.

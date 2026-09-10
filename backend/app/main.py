@@ -1,10 +1,12 @@
 import logging
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
-from .routers import assistant, auth, connections, dashboards, metrics, sync, team
+from .routers import assistant, auth, connections, dashboards, metrics, sync, team, tenant
 
 # Without this, Python's root logger defaults to WARNING with no handler attached, so every
 # INFO-level log.info() call anywhere in the app (e.g. the dev-mode "email" fallback) is
@@ -12,7 +14,7 @@ from .routers import assistant, auth, connections, dashboards, metrics, sync, te
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("apicem")
 
-app = FastAPI(title="Apicem Analytics API", version="0.1.0")
+app = FastAPI(title="Apicem Engine Analytics API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -46,6 +48,14 @@ app.include_router(metrics.router)
 app.include_router(dashboards.router)
 app.include_router(team.router)
 app.include_router(assistant.router)
+app.include_router(tenant.router)
+
+# Serves uploaded workspace logos (tenant.py writes here) -- local-disk storage, consistent
+# with this product's local-only scope. create=True so a fresh checkout with no logos
+# uploaded yet doesn't 500 on startup for a missing directory.
+_UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "uploads")
+os.makedirs(os.path.join(_UPLOADS_DIR, "logos"), exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=_UPLOADS_DIR), name="uploads")
 
 
 @app.get("/health")

@@ -30,18 +30,51 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
-class ChatMessage(BaseModel):
-    role: str
-    content: str
+class AssistantMetricResult(BaseModel):
+    metric: str
+    label: str
+    value: float | None = None
+    previous_value: float | None = None
+    delta_pct: float | None = None
+    is_estimated: bool = False
+    series: list[dict] | None = None
+    rows: list[dict] | None = None
+    start_date: str
+    end_date: str
 
 
 class AssistantAskRequest(BaseModel):
     message: str
-    history: list[ChatMessage] = []
+    # The metric + window the LAST answer was about (not a full conversation history) -- lets
+    # a bare follow-up like "and for the previous period from that?" resolve against
+    # whatever was just asked, even though this question alone names no metric.
+    previous_metric: str | None = None
+    previous_start_date: str | None = None
+    previous_end_date: str | None = None
 
 
 class AssistantAskResponse(BaseModel):
     reply: str
+    results: list[AssistantMetricResult] = []
+
+
+class AssistantMessageOut(BaseModel):
+    message_id: str
+    role: str
+    content: str
+    results: list[AssistantMetricResult] = []
+    created_at: datetime
+
+
+class AssistantCapabilityMetric(BaseModel):
+    key: str
+    label: str
+    kind: str
+
+
+class AssistantCapabilityCategory(BaseModel):
+    category: str
+    metrics: list[AssistantCapabilityMetric]
 
 
 class TokenResponse(BaseModel):
@@ -55,6 +88,12 @@ class MeResponse(BaseModel):
     email: str
     role: str
     tenant_name: str
+    tenant_logo_url: Optional[str] = None
+    is_demo: bool = False
+
+
+class UpdateTenantRequest(BaseModel):
+    name: str
 
 
 class ConnectionCreateRequest(BaseModel):
@@ -101,6 +140,7 @@ class DashboardWidgetOut(BaseModel):
 class DashboardOut(BaseModel):
     id: str
     title: str
+    date_note: str
     widgets: list[DashboardWidgetOut]
 
 

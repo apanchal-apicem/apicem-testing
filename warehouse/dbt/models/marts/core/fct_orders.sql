@@ -3,6 +3,8 @@
 -- with matching SKUs exists -- Shopify alone has no COGS accounting. The dashboard layer
 -- must show these as "estimated/unavailable" rather than silently as zero when that's the
 -- case (doc Sec 5.4, 7.3).
+-- top_products (metric_registry.py) filters this table on (tenant_id, order_date_key).
+{{ config(indexes=[{'columns': ['tenant_id', 'order_date_key']}]) }}
 select
     {{ dbt_utils.generate_surrogate_key(['o.tenant_id', 'o.order_id']) }} as order_key,
     o.tenant_id,

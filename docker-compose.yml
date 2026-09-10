@@ -49,14 +49,17 @@ services:
       - ./warehouse/dbt:/dbt
 
   frontend:
-    build: ./frontend
+    # A production build now (nginx serving a static bundle), not the Vite dev server -- so
+    # VITE_API_BASE_URL has to be a build arg (baked into the JS at build time) rather than a
+    # runtime `environment:` entry, and there's no source bind-mount anymore since there's no
+    # dev server here to hot-reload against.
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
     restart: unless-stopped
-    environment:
-      VITE_API_BASE_URL: http://localhost:8000
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend/src:/app/src
+      - "5173:80"
     depends_on:
       - backend
 

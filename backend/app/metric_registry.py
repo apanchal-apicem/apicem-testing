@@ -257,6 +257,10 @@ TABLE_METRICS = {
             LIMIT 10
         """,
     },
+    # Unlike top_products/campaign_performance (genuinely "top 10" rankings), the Inventory
+    # dashboard's table has an "All inventory" view that needs the real catalog, not a top-10
+    # slice -- 500 is a generous bound for a real SMB catalog rather than the true unbounded
+    # count, so a pathologically large catalog still can't blow up the response.
     "inventory_by_product": {
         "label": "Inventory by Product (lowest stock first)",
         "sql": """
@@ -268,7 +272,7 @@ TABLE_METRICS = {
                 WHERE tenant_id = :tenant_id AND date_key <= :end_date
             )
             ORDER BY fis.quantity_available ASC
-            LIMIT 10
+            LIMIT 500
         """,
     },
 }

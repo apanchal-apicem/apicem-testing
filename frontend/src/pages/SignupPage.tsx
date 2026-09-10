@@ -30,13 +30,13 @@ export function SignupPage() {
       <div className="auth-brand-panel">
         <div className="brand">
           <div className="brand-mark" />
-          <div className="brand-name">Apicem</div>
+          <div className="brand-name">Apicem Engine</div>
         </div>
         <div className="auth-brand-copy">
           <h2>Predefined dashboards that actually answer "how's the business doing?"</h2>
           <p>Sign up, connect a source (or try it with sample data), and your first dashboard is ready in under a minute.</p>
         </div>
-        <div className="auth-brand-foot">Apicem Analytics Platform</div>
+        <div className="auth-brand-foot">Apicem Engine Analytics Platform</div>
       </div>
       <div className="auth-form-panel">
         <div className="auth-card">

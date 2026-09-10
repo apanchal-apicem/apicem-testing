@@ -12,4 +12,7 @@ passlib[bcrypt]==1.7.4
 # pin the last pre-4.x release until passlib publishes a fix.
 bcrypt==3.2.2
 cryptography==42.0.5
-requests==2.32.3
+python-multipart==0.0.32
+# Was already installed transitively via starlette's TestClient, but not a declared
+# dependency -- groq_fallback.py now genuinely relies on it, so pin it directly.
+httpx==0.27.0
