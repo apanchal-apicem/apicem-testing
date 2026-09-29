@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./.venv/Scripts/python.exe -c ' *)"
+      "Bash(./.venv/Scripts/python.exe -c ' *)",
+      "Bash(nohup npm run dev -- --port 5174)",
+      "Bash(disown)",
+      "Read(//tmp/**)",
+      "Bash(netstat -ano)",
+      "Bash('D:/all projects/apicem_engine_oct26/backend/.venv/Scripts/python.exe' -c ' *)",
+      "Bash(awk '{print $5}')",
+      "Bash(rm -f /tmp/v1_cookies.txt)",
+      "Bash(curl -sS -m 10 -X POST http://localhost:8000/api/v1/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"v1authqa@example.com\",\"password\":\"TestPass123!\"}' -c /tmp/v1_cookies.txt -w \"HTTP %{http_code}\\\\n\")",
+      "Bash(curl -sS -m 10 http://localhost:8000/api/v1/me -b /tmp/v1_cookies.txt -w \"\\\\nHTTP %{http_code}\\\\n\")"
     ]
   }
 }

@@ -7,6 +7,8 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .routers import assistant, auth, connections, dashboards, metrics, sync, team, tenant
+from .v1 import auth as v1_auth
+from .v1 import workspace as v1_workspace
 
 # Without this, Python's root logger defaults to WARNING with no handler attached, so every
 # INFO-level log.info() call anywhere in the app (e.g. the dev-mode "email" fallback) is
@@ -24,7 +26,10 @@ app.add_middleware(
     # (RFC 1918), all on the frontend's fixed dev port. Deliberately doesn't match public
     # IPs -- this stays a LAN-only allowance, consistent with this product being local-only
     # by choice (no public hosting yet).
-    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1|10(\.\d{1,3}){3}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|192\.168(\.\d{1,3}){2}):5173$",
+    # :5173 = the old frontend's fixed dev port; :5174 = the new frontend's, added
+    # alongside it during the transition rather than replacing it (both run simultaneously
+    # for now).
+    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1|10(\.\d{1,3}){3}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|192\.168(\.\d{1,3}){2}):(5173|5174)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,6 +54,13 @@ app.include_router(dashboards.router)
 app.include_router(team.router)
 app.include_router(assistant.router)
 app.include_router(tenant.router)
+
+# New frontend's backend (see the plan doc): every path exactly as documented in
+# apps/web/src/api/real/adapter.ts's header comment, under /api/v1 to keep it fully separate
+# from the old frontend's unprefixed routes above -- both frontends run against this same
+# backend process simultaneously during the transition.
+app.include_router(v1_auth.router, prefix="/api/v1")
+app.include_router(v1_workspace.router, prefix="/api/v1")
 
 # Serves uploaded workspace logos (tenant.py writes here) -- local-disk storage, consistent
 # with this product's local-only scope. create=True so a fresh checkout with no logos

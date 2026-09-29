@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 24
 
+    # False = correct for local http:// dev (a Secure cookie is silently never sent over plain
+    # http at all -- setting this True locally would make every session cookie a no-op, not a
+    # stricter one). Must flip to True the moment real hosting/HTTPS exists.
+    cookie_secure: bool = False
+
     # Used to envelope-encrypt connection credentials before they're stored in app.secrets
     # (doc Sec 2.2, 11). Real deployments should use AWS Secrets Manager/Vault instead.
     fernet_key: str = ""

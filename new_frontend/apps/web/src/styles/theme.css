@@ -1,0 +1,108 @@
+/**
+ * Design tokens for Apicem Engine.
+ *
+ * Palette and type carry over Apicem Partners' own site identity (pill
+ * navigation, black-primary / gold-accent, numbered sections, rounded
+ * geometric display type) so the product reads as the same company as the
+ * marketing site. Tokens are plain CSS custom properties so the same names
+ * resolve correctly under both themes. `<html>` always carries an explicit
+ * `data-theme="light"` or `"dark"` (see stores/theme.ts) — there's no
+ * "system" mode to track, so light lives in the bare `:root` and dark is
+ * the one override block, with no `prefers-color-scheme` query involved.
+ */
+
+:root {
+  --bg: #f6f5f2;
+  --surface: #ffffff;
+  --surface-2: #efece5;
+  --border: #e2ded4;
+  --border-strong: #9e9377;
+
+  --ink: #15140f;
+  --ink-soft: #5c584e;
+  --ink-faint: #6f6a5f;
+
+  --primary: #15140f;
+  --primary-ink: #f8f7f4;
+  --primary-hover: #2b2920;
+
+  --accent: #b38e3b;
+  --accent-ink: #7c5e21;
+  --accent-soft: rgba(179, 142, 59, 0.14);
+
+  --success: #3c7451;
+  --success-soft: rgba(60, 116, 81, 0.14);
+  --danger: #ac4530;
+  --danger-soft: rgba(172, 69, 48, 0.12);
+  --info: #3b5f8a;
+  --info-soft: rgba(59, 95, 138, 0.12);
+
+  --shadow-color: 30 25% 10%;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+
+  --font-display: "Afacad Flux", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Afacad Flux", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* categorical series for charts, in preference order */
+  --chart-1: #15140f;
+  --chart-2: #b8923d;
+  --chart-3: #3b5f8a;
+  --chart-4: #7a8f6d;
+  --chart-5: #a15a3f;
+  --chart-6: #6e6656;
+}
+
+:root[data-theme="dark"] {
+  --bg: #121210;
+  --surface: #1a1a17;
+  --surface-2: #212120;
+  --border: #302f29;
+  --border-strong: #6a6758;
+
+  --ink: #f3f1ea;
+  --ink-soft: #a9a599;
+  --ink-faint: #8d887b;
+
+  --primary: #f3f1ea;
+  --primary-ink: #15140f;
+  --primary-hover: #dcd8cd;
+
+  --accent: #dcb666;
+  --accent-ink: #f0cd8b;
+  --accent-soft: rgba(220, 182, 102, 0.16);
+
+  --success: #75b98d;
+  --success-soft: rgba(117, 185, 141, 0.16);
+  --danger: #d97e63;
+  --danger-soft: rgba(217, 126, 99, 0.16);
+  --info: #7ea1cc;
+  --info-soft: rgba(126, 161, 204, 0.16);
+
+  --chart-1: #f3f1ea;
+  --chart-2: #dcb666;
+  --chart-3: #7ea1cc;
+  --chart-4: #9db38d;
+  --chart-5: #cf8a6c;
+  --chart-6: #9c9484;
+}
+
+/*
+ * The "apicem partners" wordmark ships as two PNGs (one for light
+ * backgrounds, one for dark) rather than one image color-flipped in CSS —
+ * .logo-for-dark wins under the exact same `data-theme="dark"` selector as
+ * the dark token overrides above.
+ */
+.logo-for-dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .logo-for-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .logo-for-dark {
+  display: inline;
+}

@@ -1,0 +1,36 @@
+name: CI
+
+# Runs everything a reviewer would otherwise have to remember to run by hand
+# before merging: typecheck, lint, the test suite, a production build, and a
+# dependency audit. SECURITY.md's "What's already true" section claims
+# "Zero known dependency vulnerabilities ... re-run this in CI on every PR,
+# not just once" — this is what makes that a standing guarantee instead of a
+# note about the day it was written.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
+
+      # High/critical only — a low-severity advisory in a dev-only
+      # dependency shouldn't block a merge, but this is the one class of
+      # regression that's genuinely worth failing the build over.
+      - run: npm audit --audit-level=high

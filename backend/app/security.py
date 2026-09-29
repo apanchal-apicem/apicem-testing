@@ -1,16 +1,45 @@
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from .config import settings
-from .db import get_db, set_tenant
+from .db import get_db, set_current_user, set_tenant
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+# auto_error=False: the OLD frontend still sends `Authorization: Bearer <token>` and must keep
+# working unmodified during the transition to the new frontend (which sends a session cookie
+# instead, per SECURITY.md -- "never a token the frontend stores in localStorage"). get_current
+# _user below checks the cookie FIRST, falling back to this header only if the cookie is absent,
+# so neither frontend has to change based on which one the request came from.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
+SESSION_COOKIE_NAME = "apicem_session"
+
+
+def set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        max_age=settings.jwt_expires_minutes * 60,
+        httponly=True,
+        # Secure=False is correct ONLY for local-http dev (a Secure cookie is never sent over
+        # plain http://localhost at all) -- this MUST flip to True the moment real hosting
+        # exists, same "deferred until launch" pattern as this app's other local-only defaults
+        # (FERNET_KEY, SMTP). samesite="lax" still sends the cookie on same-site fetch/XHR
+        # (localhost:5174 -> localhost:8000 are same-site, different origin), just not on a
+        # cross-site top-level navigation -- exactly what SECURITY.md asks for.
+        secure=settings.cookie_secure,
+        samesite="lax",
+        path="/",
+    )
+
+
+def clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(key=SESSION_COOKIE_NAME, path="/")
 
 
 def hash_password(password: str) -> str:
@@ -54,7 +83,10 @@ class CurrentUser:
         self.is_demo = is_demo
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> CurrentUser:
+def get_current_user(request: Request, header_token: str | None = Depends(oauth2_scheme)) -> CurrentUser:
+    token = request.cookies.get(SESSION_COOKIE_NAME) or header_token
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except jwt.PyJWTError:
@@ -79,6 +111,7 @@ def get_tenant_db(
     tenant from the authenticated session (never a client-supplied tenant id, doc Sec 6.2)
     and sets the RLS session variable before any query runs."""
     set_tenant(db, current_user.tenant_id)
+    set_current_user(db, current_user.user_id)
     return db
 
 
