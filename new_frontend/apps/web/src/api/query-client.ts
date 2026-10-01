@@ -82,3 +82,12 @@ export const persistOptions = {
     },
   },
 };
+
+export function clearQueryCache(): void {
+  queryClient.clear();
+  try {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(PERSIST_STORAGE_KEY);
+    }
+  } catch {}
+}

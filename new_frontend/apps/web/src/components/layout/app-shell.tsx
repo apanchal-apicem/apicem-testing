@@ -3,11 +3,13 @@ import { Navigate, Outlet } from "react-router-dom";
 import { Sidebar } from "./sidebar";
 import { MobileTopBar } from "./mobile-nav";
 import { RouteSkeleton } from "./route-skeleton";
-import { useAuthStore } from "@/stores/auth";
+import { useAppSelector } from "@/store";
 
 export function AppShell() {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const authStatus = useAppSelector((state) => state.auth.status);
+  if (authStatus === "checking" || authStatus === "loading")
+    return <RouteSkeleton />;
+  if (authStatus !== "authenticated") return <Navigate to="/login" replace />;
 
   return (
     <div className="flex h-dvh overflow-hidden bg-bg">
@@ -24,7 +26,11 @@ export function AppShell() {
       <Sidebar />
       <main className="min-w-0 flex-1 overflow-y-auto">
         <MobileTopBar />
-        <div id="main-content" tabIndex={-1} className="mx-auto max-w-[1400px] px-4 py-6 outline-none sm:px-8 sm:py-8 md:px-10">
+        <div
+          id="main-content"
+          tabIndex={-1}
+          className="mx-auto max-w-[1400px] px-4 py-6 outline-none sm:px-8 sm:py-8 md:px-10"
+        >
           <Suspense fallback={<RouteSkeleton />}>
             <Outlet />
           </Suspense>

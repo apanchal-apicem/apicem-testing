@@ -39,7 +39,7 @@ export const ALL_METRIC_KEYS: string[] = [
 const CATEGORY_METRIC_KEYS: [string, string[]][] = [
   ["Sales", [
     "gross_revenue", "net_revenue", "order_count", "total_discounts", "total_refunds",
-    "new_customer_count", "aov", "gross_margin_pct", "revenue_trend",
+    "new_customer_count", "aov", "gross_margin_pct", "repeat_customer_rate", "refund_rate_pct", "revenue_trend",
     "discounts_refunds_trend", "top_products",
   ]],
   ["Marketing", [
@@ -78,7 +78,7 @@ const METRIC_PHRASES: Record<string, string[]> = {
     "orders", "order count", "number of orders", "how many orders",
     "how many sales", "number of sales",
   ],
-  total_discounts: ["total discounts", "discounts", "how much discount"],
+  total_discounts: ["total discounts", "discounts", "how much discount", "discount amount"],
   total_refunds: [
     "total refunds", "refunds", "how much refunded", "how much did i refund",
     "returns", "how many refunds",
@@ -88,14 +88,23 @@ const METRIC_PHRASES: Record<string, string[]> = {
   ],
   aov: [
     "average order value", "aov", "average order size", "average sale amount",
-    "average basket size", "average cart value",
+    "average basket size", "average cart value", "how has average order value changed",
   ],
   gross_margin_pct: [
     "gross margin", "margin percent", "profit margin", "how profitable am i", "profitability",
   ],
+  repeat_customer_rate: [
+    "repeat customer rate", "repeat purchase rate", "repeat customers", "customer retention",
+    "retention rate", "returning customers", "repeat purchase", "share of customers made a repeat purchase",
+    "what share of customers made a repeat purchase", "share of repeat customers",
+  ],
+  refund_rate_pct: [
+    "refund rate", "return rate", "returns rate", "refund percent", "return percent",
+  ],
   revenue_trend: [
     "revenue trend", "sales trend", "revenue over time", "sales over time", "daily revenue",
     "trend", "graph my revenue", "graph revenue", "plot revenue", "plot sales",
+    "how has net revenue trended", "how has revenue trended",
   ],
   discounts_refunds_trend: [
     "discounts and refunds trend", "discounts refunds trend", "discounts trend", "refunds trend",
@@ -103,7 +112,8 @@ const METRIC_PHRASES: Record<string, string[]> = {
   top_products: [
     "top products by revenue", "top products", "best selling products", "best sellers",
     "top selling", "which products sell best", "what's selling well", "whats selling well",
-    "what are people buying",
+    "what are people buying", "drove the most revenue", "which products drove the most revenue",
+    "highest revenue products", "most revenue products",
   ],
 
   // Marketing
@@ -307,6 +317,16 @@ function matchRelativeDays(question: string, todayDate: PlainDate): DateWindowMa
   return [start, todayDate, `the last ${n} days`];
 }
 
+/** "last N weeks"/"past N weeks" -- a rolling window ending today. */
+function matchRelativeWeeks(question: string, todayDate: PlainDate): DateWindowMatch | null {
+  const match = /(?:last|past)\s+(\d+)\s+weeks?/.exec(question.toLowerCase());
+  if (!match) return null;
+  const n = Number(match[1]);
+  if (n <= 0) return null;
+  const start = dm.addDays(todayDate, -(n * 7));
+  return [start, todayDate, `the last ${n} weeks`];
+}
+
 /** "last N months"/"past N months" -- a rolling window ending today (not aligned to calendar
  * month boundaries; that's what a named month or "this/last month" is for). */
 function matchRelativeMonths(question: string, todayDate: PlainDate): DateWindowMatch | null {
@@ -367,6 +387,9 @@ export function tryMatchDateWindow(question: string, todayDate: PlainDate): Date
   const relativeDays = matchRelativeDays(question, todayDate);
   if (relativeDays) return relativeDays;
 
+  const relativeWeeks = matchRelativeWeeks(question, todayDate);
+  if (relativeWeeks) return relativeWeeks;
+
   const relativeMonths = matchRelativeMonths(question, todayDate);
   if (relativeMonths) return relativeMonths;
 
@@ -402,7 +425,8 @@ export function wantsCompare(question: string): boolean {
 const GREETING_PATTERNS = [
   /\bhi\b/, /\bhello\b/, /\bhey\b/, /\bhowdy\b/,
   /\bthanks\b/, /\bthank you\b/,
-  /\bwhat can you (help with|do)\b/,
+  /\bwho are you\b/, /\bwhat are you\b/, /\bwhat is this\b/,
+  /\bwhat can you (help with|do)\b/, /\bhelp\b/,
 ];
 
 export function isGreeting(question: string): boolean {
@@ -513,7 +537,7 @@ export async function askAssistant(
     // Checked last, after every real match attempt above, so it can never preempt an actual
     // question that happens to also contain a greeting word.
     return {
-      reply: "Hi! Ask me about your revenue, orders, ad spend, or inventory -- try one of the suggestions below to get started.",
+      reply: "I am Apicem Engine's analytics assistant. I can help you analyze your business metrics across revenue, orders, marketing, and inventory. Try asking: 'What was our net revenue last month?' or 'Show me top products'.",
       results: [],
     };
   } else if (

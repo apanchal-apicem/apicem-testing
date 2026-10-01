@@ -41,6 +41,11 @@ const steps = [
 export function OnboardingPage() {
   const navigate = useNavigate();
 
+  function continueTo(path: string) {
+    window.localStorage.setItem("apicem.onboardingComplete", "1");
+    navigate(path);
+  }
+
   return (
     <div className="min-h-dvh bg-bg px-6 py-12">
       <div className="absolute right-6 top-6">
@@ -55,7 +60,8 @@ export function OnboardingPage() {
           Four steps to your first proven answer
         </h1>
         <p className="mx-auto mt-2 max-w-md text-center text-[14px] text-ink-soft">
-          Northwind Outfitters is set up with fixture data so you can try the whole loop before connecting anything real.
+          Northwind Outfitters is set up with fixture data so you can try the
+          whole loop before connecting anything real.
         </p>
 
         <div className="mt-10 space-y-4">
@@ -65,16 +71,27 @@ export function OnboardingPage() {
               className="flex flex-col gap-4 rounded-(--radius-lg) border border-border bg-surface p-5 sm:flex-row sm:items-center sm:gap-5"
             >
               <div className="flex items-center gap-4 sm:gap-5">
-                <span className="font-display text-2xl font-bold text-border-strong">{step.n}</span>
+                <span className="font-display text-2xl font-bold text-border-strong">
+                  {step.n}
+                </span>
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-ink">
                   <step.icon className="size-5" strokeWidth={1.75} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-display text-[15px] font-semibold text-ink">{step.title}</p>
-                  <p className="mt-0.5 text-[13px] text-ink-soft">{step.body}</p>
+                  <p className="font-display text-[15px] font-semibold text-ink">
+                    {step.title}
+                  </p>
+                  <p className="mt-0.5 text-[13px] text-ink-soft">
+                    {step.body}
+                  </p>
                 </div>
               </div>
-              <Button variant="outline" withArrow className="w-full shrink-0 sm:w-auto" onClick={() => navigate(step.to)}>
+              <Button
+                variant="outline"
+                withArrow
+                className="w-full shrink-0 sm:w-auto"
+                onClick={() => continueTo(step.to)}
+              >
                 {step.cta}
               </Button>
             </div>
@@ -82,7 +99,10 @@ export function OnboardingPage() {
         </div>
 
         <div className="mt-8 text-center">
-          <button onClick={() => navigate("/")} className="text-[13px] font-medium text-ink-faint hover:text-ink">
+          <button
+            onClick={() => continueTo("/")}
+            className="text-[13px] font-medium text-ink-faint hover:text-ink"
+          >
             Skip, take me straight to the workspace
           </button>
         </div>

@@ -25,11 +25,17 @@ export default async function connectionsRoutes(fastify: FastifyInstance): Promi
       const currentUser = request.currentUser!;
       const body = request.body as {
         source_type?: string;
+        display_name?: string;
+        name?: string;
         use_mock_data?: boolean;
         credentials?: Record<string, string>;
       };
       const sourceType = body.source_type ?? "shopify";
       const useMockData = body.use_mock_data ?? true;
+      const displayName =
+        body.display_name?.trim() ||
+        body.name?.trim() ||
+        `${sourceType.charAt(0).toUpperCase() + sourceType.slice(1)} connection`;
 
       if (!(sourceType in REQUIRED_CREDENTIAL_FIELDS)) {
         return reply.code(400).send({
@@ -62,10 +68,10 @@ export default async function connectionsRoutes(fastify: FastifyInstance): Promi
         }
 
         const result = await client.query(
-          `INSERT INTO app.connections (tenant_id, source_type, secret_ref, use_mock_data, status)
-           VALUES ($1, $2, $3, $4, 'pending')
-           RETURNING connection_id, source_type, status, use_mock_data, last_synced_at, last_error, created_at`,
-          [currentUser.tenantId, sourceType, secretId, useMockData],
+          `INSERT INTO app.connections (tenant_id, source_type, display_name, secret_ref, use_mock_data, status)
+           VALUES ($1, $2, $3, $4, $5, 'pending')
+           RETURNING connection_id, source_type, display_name, status, use_mock_data, last_synced_at, last_error, created_at`,
+          [currentUser.tenantId, sourceType, displayName, secretId, useMockData],
         );
         return reply.code(201).send(result.rows[0]);
       });
@@ -76,7 +82,7 @@ export default async function connectionsRoutes(fastify: FastifyInstance): Promi
     const currentUser = request.currentUser!;
     return withTenant(currentUser.tenantId, async (client) => {
       const result = await client.query(
-        `SELECT connection_id, source_type, status, use_mock_data, last_synced_at, last_error, created_at
+        `SELECT connection_id, source_type, display_name, status, use_mock_data, last_synced_at, last_error, created_at
          FROM app.connections ORDER BY created_at DESC`,
       );
       return reply.send(result.rows);

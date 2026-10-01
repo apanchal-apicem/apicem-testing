@@ -63,36 +63,49 @@ export async function classifyViaGroq(
 
   const validMetricKeys = new Set(metricOptions.map((m) => m.key));
 
-  let parsed: { metric_key?: unknown; date_range_key?: unknown };
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    let response: Response;
+  const candidateModels = Array.from(
+    new Set([settings.groqModel || "openai/gpt-oss-20b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]),
+  );
+
+  let parsed: { metric_key?: unknown; date_range_key?: unknown } | null = null;
+  for (const model of candidateModels) {
     try {
-      response = await fetch(GROQ_API_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${settings.groqApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: settings.groqModel,
-          messages: [{ role: "user", content: buildPrompt(message, metricOptions, dateKeys) }],
-          response_format: { type: "json_object" },
-          temperature: 0,
-        }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      let response: Response;
+      try {
+        response = await fetch(GROQ_API_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${settings.groqApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "user", content: buildPrompt(message, metricOptions, dateKeys) }],
+            response_format: { type: "json_object" },
+            temperature: 0,
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (!response.ok) {
+        const errText = await response.text();
+        console.warn(`[GROQ_WARN] Model "${model}" returned ${response.status}, trying fallback:`, errText);
+        continue;
+      }
+      const body = (await response.json()) as { choices: { message: { content: string } }[] };
+      parsed = JSON.parse(body.choices[0].message.content);
+      if (parsed) break;
+    } catch (err) {
+      console.warn(`[GROQ_WARN] Model "${model}" request error, trying fallback:`, err);
     }
-    if (!response.ok) {
-      throw new Error(`Groq API returned ${response.status}`);
-    }
-    const body = (await response.json()) as { choices: { message: { content: string } }[] };
-    parsed = JSON.parse(body.choices[0].message.content);
-  } catch (err) {
-    console.error("Groq classification call failed; falling back to the honest rejection", err);
+  }
+
+  if (!parsed) {
+    console.error("All Groq classification models failed; falling back to the honest rejection");
     return null;
   }
 

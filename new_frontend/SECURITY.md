@@ -10,13 +10,13 @@ and to be upfront about what's still open.
 ## Tenant isolation — client A can never see client B's rows
 
 **The guarantee:** a request from one workspace can never return another
-workspace's data, and nothing about the *content* of a request — a typed
+workspace's data, and nothing about the _content_ of a request — a typed
 question, a crafted filter, a prompt-injection attempt against the
 natural-language query feature — can change that.
 
 **Why this has to be enforced below the LLM, not by it.** The "Ask" feature
 turns a natural-language question into a query. If tenant scoping were
-something the model was merely *instructed* to respect ("only return data for
+something the model was merely _instructed_ to respect ("only return data for
 workspace X"), a sufficiently adversarial question could talk it out of that
 instruction — that's a real, demonstrated class of attack against
 LLM-mediated data access, not a hypothetical. So the rule is: **the model
@@ -24,13 +24,13 @@ never sees or produces anything that includes a workspace/tenant identifier,
 and never executes anything with database-level reach.** Concretely, for
 whoever builds the backend:
 
-1. The authenticated session (cookie or token) is the *only* source of the
+1. The authenticated session (cookie or token) is the _only_ source of the
    current workspace ID, resolved by the backend before any query logic runs.
    No request type in `packages/api-contract` accepts a `workspaceId` field —
    that's deliberate. If a future endpoint needs one, it must come from the
    session, never from the request body, a header, or anything the client
    (or a prompt) supplies.
-2. The model's job is narrow: turn a question into a *query spec* (a metric
+2. The model's job is narrow: turn a question into a _query spec_ (a metric
    id, dimensions, filters) chosen from an allowlist of the workspace's own
    defined metrics and columns — never raw SQL, never an arbitrary table
    reference. That spec is then executed by ordinary application code that
@@ -51,7 +51,7 @@ whoever builds the backend:
 real query executor or database to run row-level-security tests against.
 This section is the specification the backend must satisfy, and it should be
 the first thing tested (a two-workspace fixture, one query, assert zero
-cross-contamination) once it exists. What the mock *can* and does prove: the
+cross-contamination) once it exists. What the mock _can_ and does prove: the
 fixture layer models two genuinely separate workspaces (Northwind Outfitters,
 Aurora Fitness Co.) with their own sources, metrics, and query engines —
 switch workspaces in the app and every number on screen changes, because
@@ -64,7 +64,7 @@ client-supplied workspace id legitimately crosses the wire — see the header
 comment in `entities.ts`. That's a deliberate, narrow exception to the rule
 above, not a crack in it: the backend must still independently verify the
 session's user is actually a member of that workspace before honoring the
-switch, and every *data* request made afterward goes back to deriving its
+switch, and every _data_ request made afterward goes back to deriving its
 scope from the session alone, exactly as before. Creating a workspace
 (`createWorkspace`) carries the same obligation, since it also switches the
 session into the new workspace.
@@ -78,8 +78,8 @@ exactly the kind of filter that's easy to get subtly wrong, and this is the
 one moment wrong is expensive. Building this surfaced a genuine race: the
 query cache also persists to `localStorage` on a throttle for fast reloads
 (see PERFORMANCE.md), and a switch immediately followed by a reload could
-land *before* that throttle flushed the cleared state — the reload would
-then restore the *previous* workspace's still-on-disk snapshot, which reads
+land _before_ that throttle flushed the cleared state — the reload would
+then restore the _previous_ workspace's still-on-disk snapshot, which reads
 as fresh for whatever's left of its `staleTime`. Confirmed by reproducing it
 with a real switch-then-reload. The fix calls the persister's `removeClient`
 synchronously in the same success handler, so a reload right after switching
@@ -92,7 +92,7 @@ logic is written assuming "the data" has one meaning for the whole session.
 clicking through the UI:** the mock's `switchWorkspace` was written to reject
 an id for a workspace the user isn't a member of — but the lookup it checked
 (`fixtures.ts`'s `getBundle`) silently fell back to the default workspace for
-*any* unrecognized id, a leftover from the single-workspace era before this
+_any_ unrecognized id, a leftover from the single-workspace era before this
 fell back to "the only workspace" was harmless. That made the membership
 check unreachable: every id "existed," so nothing was ever rejected. A test
 asserting that a garbage workspace id gets a 403 caught it (`adapter.test.ts`,
@@ -113,7 +113,7 @@ bug and re-running it lands on the source's true row count — it never adds a
 second copy of what the failed attempt already wrote.
 
 **How:** every sync run carries an `idempotencyKey` (see `SyncRun` in
-`entities.ts`). A retry of a failed run reuses the *same* key. The backend's
+`entities.ts`). A retry of a failed run reuses the _same_ key. The backend's
 sync job upserts each row on its natural key (e.g. the source system's own
 `order_id`, `event_id`) rather than blindly inserting — so writing the same
 row twice under the same key is a no-op, not a duplicate. This is why
@@ -124,7 +124,7 @@ far), attempt 2 succeeds and lands on the true total, same idempotency key
 both times.
 
 The one thing to also guard at the HTTP layer: a user double-clicking retry,
-or a network-level retry of the *request itself*, shouldn't kick off two
+or a network-level retry of the _request itself_, shouldn't kick off two
 independent sync jobs. `src/api/real/adapter.ts`'s `retrySync` sends a
 client-generated `Idempotency-Key` header per click for exactly this reason —
 the backend should treat two requests with the same key (within a
@@ -168,17 +168,17 @@ any response — including error messages.
 
 ## What's explicitly not true yet
 
-- **No real authentication.** `/login` currently accepts anything and
-  navigates straight in; there's no session, no route guarding, no real
-  identity. This is fine for a fixture-data demo and not fine for a single
-  additional day past connecting a real backend. The real backend must issue
-  short-lived, `httpOnly`, `Secure`, `SameSite=Lax`-or-stricter session
-  cookies (never a token the frontend stores in `localStorage`, which is
-  readable by any script that runs on the page).
-- **Role changes in Settings → Members are local UI state only** — they
-  don't persist and don't enforce anything. RBAC must be enforced
-  server-side, on every request, derived from the session — never trusted
-  from a client-sent role field.
+- **Cookie authentication is implemented for the new frontend.** Signup,
+  sign-in, sign-out, and session lookup use the V1 auth routes; the backend
+  issues an `httpOnly`, `SameSite=Lax` session cookie and the frontend never
+  stores the token in `localStorage`. The `Secure` flag is disabled only for
+  local HTTP development and must be enabled behind HTTPS before deployment.
+  The mock adapter's local sign-in flag is demo-only and is not an auth
+  boundary.
+- **Settings writes use session-scoped backend routes.** Profile names,
+  workspace names, password changes, and membership role changes are
+  persisted. Role authorization is enforced server-side; UI-disabled
+  controls are only a usability layer, never the security boundary.
 - **No Content-Security-Policy or security headers yet**, because those
   belong at the hosting/CDN layer for a static SPA, not baked into
   `index.html` (a meta-tag CSP shared between dev and prod risks breaking

@@ -137,12 +137,28 @@ def _due_connections(cur):
 
 def _record_job(conn, tenant_id, connection_id, job_type, fn):
     with conn.cursor() as cur:
-        cur.execute(
-            """INSERT INTO app.job_runs (tenant_id, connection_id, job_type, status)
-               VALUES (%s, %s, %s, 'running') RETURNING job_run_id""",
-            (tenant_id, connection_id, job_type),
-        )
-        job_run_id = cur.fetchone()[0]
+        # A v1 user-triggered sync creates its run before the poller picks it
+        # up so the UI gets a durable id immediately. Reuse that queued run;
+        # scheduled syncs still create their own run here as before.
+        if job_type == "extract":
+            cur.execute(
+                """SELECT job_run_id FROM app.job_runs
+                   WHERE connection_id = %s AND job_type = 'extract' AND status = 'running'
+                   ORDER BY started_at ASC LIMIT 1""",
+                (connection_id,),
+            )
+            existing = cur.fetchone()
+        else:
+            existing = None
+        if existing:
+            job_run_id = existing[0]
+        else:
+            cur.execute(
+                """INSERT INTO app.job_runs (tenant_id, connection_id, job_type, status)
+                   VALUES (%s, %s, %s, 'running') RETURNING job_run_id""",
+                (tenant_id, connection_id, job_type),
+            )
+            job_run_id = cur.fetchone()[0]
     conn.commit()
 
     records_synced = None

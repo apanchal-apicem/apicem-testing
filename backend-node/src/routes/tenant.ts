@@ -43,7 +43,7 @@ export default async function tenantRoutes(fastify: FastifyInstance): Promise<vo
       return withTenant(currentUser.tenantId, async (client) => {
         await client.query("UPDATE app.tenants SET name = $1 WHERE tenant_id = $2", [name, currentUser.tenantId]);
         return reply.code(204).send();
-      });
+      }, currentUser.userId);
     },
   );
 
@@ -86,7 +86,7 @@ export default async function tenantRoutes(fastify: FastifyInstance): Promise<vo
           currentUser.tenantId,
         ]);
         return reply.code(204).send();
-      });
+      }, currentUser.userId);
     },
   );
 
@@ -101,7 +101,7 @@ export default async function tenantRoutes(fastify: FastifyInstance): Promise<vo
       return withTenant(currentUser.tenantId, async (client) => {
         await client.query("UPDATE app.tenants SET logo_url = NULL WHERE tenant_id = $1", [currentUser.tenantId]);
         return reply.code(204).send();
-      });
+      }, currentUser.userId);
     },
   );
 }

@@ -5,21 +5,32 @@ import type {
   CreateWorkbookInput,
   CreateWorkspaceInput,
   DataSource,
+  DatasetSchema,
   Experiment,
   QueryFilter,
   QueryResult,
   Report,
+  Role,
   RunPivotQueryInput,
   RunQueryInput,
   SyncRun,
   UpdateExperimentInput,
   UpdateReportInput,
+  User,
   Workbook,
   Workspace,
 } from "@apicem/api-contract";
 import type { ApiClient } from "../types";
 import { ApiError } from "../types";
-import { createQueryEngine, currentUser, defaultWorkspaceId, getBundle, listWorkspaceSummaries, type WorkspaceBundle } from "./fixtures";
+import {
+  createQueryEngine,
+  currentUser,
+  defaultWorkspaceId,
+  getBundle,
+  getSchemaPreviewForType,
+  listWorkspaceSummaries,
+  type WorkspaceBundle,
+} from "./fixtures";
 
 // Real network latency to simulate, kept low on purpose: this is standing in
 // for a backend that (per PERFORMANCE.md) should be answering cached/indexed
@@ -55,9 +66,22 @@ function saveState<T>(key: string, value: T) {
 // exception is ACTIVE_WORKSPACE_KEY itself — that's the pointer that says
 // *which* workspace-scoped bucket is current, so it can't be scoped by the
 // thing it's pointing at.
-const workspaceKey = (workspaceId: string, name: string) => `apicem.mock.${workspaceId}.${name}`;
+const workspaceKey = (workspaceId: string, name: string) =>
+  `apicem.mock.${workspaceId}.${name}`;
 const ACTIVE_WORKSPACE_KEY = "apicem.mock.activeWorkspaceId";
 const CUSTOM_WORKSPACES_KEY = "apicem.mock.customWorkspaces";
+const WORKSPACE_OVERRIDES_KEY = "apicem.mock.workspaceOverrides";
+const MEMBER_ROLE_OVERRIDES_KEY = "apicem.mock.memberRoleOverrides";
+const PROFILE_NAME_KEY = "apicem.mock.profileName";
+
+const workspaceOverrides = loadState<
+  Record<string, Pick<Workspace, "name" | "slug">>
+>(WORKSPACE_OVERRIDES_KEY, {});
+const memberRoleOverrides = loadState<Record<string, Record<string, Role>>>(
+  MEMBER_ROLE_OVERRIDES_KEY,
+  {},
+);
+let profileName = loadState(PROFILE_NAME_KEY, currentUser.name);
 
 interface CustomWorkspaceRecord {
   id: string;
@@ -66,7 +90,13 @@ interface CustomWorkspaceRecord {
 }
 
 function slugify(name: string): string {
-  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "workspace";
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "workspace"
+  );
 }
 
 /** A brand-new workspace starts genuinely empty — no sources, no metrics, nothing to ask — the same "connect a source first" state onboarding already walks a user through, rather than a fake pre-populated demo. */
@@ -96,17 +126,47 @@ function createEmptyBundle(workspace: Workspace): WorkspaceBundle {
 // {id, name, slug} record on load — each still gets its own genuinely empty
 // bundle; any data source/report/experiment a user later adds to one lives
 // in that workspace's own namespaced storage exactly like a seed workspace's.
-const customWorkspaces = loadState<CustomWorkspaceRecord[]>(CUSTOM_WORKSPACES_KEY, []);
+const customWorkspaces = loadState<CustomWorkspaceRecord[]>(
+  CUSTOM_WORKSPACES_KEY,
+  [],
+);
 const customBundles: Record<string, WorkspaceBundle> = {};
 for (const record of customWorkspaces) {
-  customBundles[record.id] = createEmptyBundle({ id: record.id, name: record.name, slug: record.slug, plan: "starter", memberCount: 1 });
+  customBundles[record.id] = createEmptyBundle({
+    id: record.id,
+    name: record.name,
+    slug: record.slug,
+    plan: "starter",
+    memberCount: 1,
+  });
 }
 
 function getBundleFor(workspaceId: string): WorkspaceBundle | undefined {
-  return customBundles[workspaceId] ?? getBundle(workspaceId);
+  const bundle = customBundles[workspaceId] ?? getBundle(workspaceId);
+  if (!bundle) return undefined;
+  const workspace = workspaceOverrides[workspaceId];
+  const roles = memberRoleOverrides[workspaceId];
+  if (!workspace && !roles) return bundle;
+  const members = roles
+    ? bundle.members.map((member) => ({
+        ...member,
+        role: roles[member.id] ?? member.role,
+      }))
+    : bundle.members;
+  return {
+    ...bundle,
+    workspace: workspace
+      ? { ...bundle.workspace, ...workspace }
+      : bundle.workspace,
+    members,
+    myRole: roles?.[currentUser.id] ?? bundle.myRole,
+  };
 }
 
-let activeWorkspaceId = loadState<string>(ACTIVE_WORKSPACE_KEY, defaultWorkspaceId);
+let activeWorkspaceId = loadState<string>(
+  ACTIVE_WORKSPACE_KEY,
+  defaultWorkspaceId,
+);
 if (!getBundleFor(activeWorkspaceId)) activeWorkspaceId = defaultWorkspaceId;
 
 /**
@@ -119,13 +179,18 @@ if (!getBundleFor(activeWorkspaceId)) activeWorkspaceId = defaultWorkspaceId;
  */
 function getActiveBundle(): WorkspaceBundle {
   const bundle = getBundleFor(activeWorkspaceId);
-  if (!bundle) throw new ApiError(`Active workspace "${activeWorkspaceId}" no longer exists`, 500);
+  if (!bundle)
+    throw new ApiError(
+      `Active workspace "${activeWorkspaceId}" no longer exists`,
+      500,
+    );
   return bundle;
 }
 
 /** The mutable, user-editable slice of a workspace's data — everything else on a bundle (metrics, schema, members, the query engine) is fixed reference data for that workspace. */
 interface WorkspaceSlice {
   dataSources: DataSource[];
+  schemaBySource: Record<string, DatasetSchema>;
   workbooks: Workbook[];
   reports: Report[];
   experiments: Experiment[];
@@ -138,17 +203,34 @@ function getSlice(workspaceId: string): WorkspaceSlice {
   let slice = sliceCache.get(workspaceId);
   if (!slice) {
     const bundle = getBundleFor(workspaceId);
-    if (!bundle) throw new ApiError(`Workspace "${workspaceId}" not found`, 500);
+    if (!bundle)
+      throw new ApiError(`Workspace "${workspaceId}" not found`, 500);
     slice = {
-      dataSources: loadState(workspaceKey(workspaceId, "dataSources"), bundle.dataSources),
+      dataSources: loadState(
+        workspaceKey(workspaceId, "dataSources"),
+        bundle.dataSources,
+      ),
+      schemaBySource: loadState(
+        workspaceKey(workspaceId, "schemaBySource"),
+        bundle.schemaBySource,
+      ),
       // Filtered rather than trusted as-is: a browser that persisted state
       // before reports stopped being mirrored in here (see northwindWorkbooks's
       // doc comment) can still have stale kind:"report" rows saved locally —
       // self-heals on load instead of showing a report's card twice.
-      workbooks: loadState(workspaceKey(workspaceId, "workbooks"), bundle.workbooks).filter((w) => w.kind !== "report"),
+      workbooks: loadState(
+        workspaceKey(workspaceId, "workbooks"),
+        bundle.workbooks,
+      ).filter((w) => w.kind !== "report"),
       reports: loadState(workspaceKey(workspaceId, "reports"), bundle.reports),
-      experiments: loadState(workspaceKey(workspaceId, "experiments"), bundle.experiments),
-      syncRunsBySource: loadState(workspaceKey(workspaceId, "syncRuns"), bundle.syncRunsBySource),
+      experiments: loadState(
+        workspaceKey(workspaceId, "experiments"),
+        bundle.experiments,
+      ),
+      syncRunsBySource: loadState(
+        workspaceKey(workspaceId, "syncRuns"),
+        bundle.syncRunsBySource,
+      ),
     };
     sliceCache.set(workspaceId, slice);
   }
@@ -158,11 +240,21 @@ function getSlice(workspaceId: string): WorkspaceSlice {
 function setSlice(workspaceId: string, patch: Partial<WorkspaceSlice>) {
   const slice = getSlice(workspaceId);
   Object.assign(slice, patch);
-  if (patch.dataSources) saveState(workspaceKey(workspaceId, "dataSources"), slice.dataSources);
-  if (patch.workbooks) saveState(workspaceKey(workspaceId, "workbooks"), slice.workbooks);
-  if (patch.reports) saveState(workspaceKey(workspaceId, "reports"), slice.reports);
-  if (patch.experiments) saveState(workspaceKey(workspaceId, "experiments"), slice.experiments);
-  if (patch.syncRunsBySource) saveState(workspaceKey(workspaceId, "syncRuns"), slice.syncRunsBySource);
+  if (patch.dataSources)
+    saveState(workspaceKey(workspaceId, "dataSources"), slice.dataSources);
+  if (patch.schemaBySource)
+    saveState(
+      workspaceKey(workspaceId, "schemaBySource"),
+      slice.schemaBySource,
+    );
+  if (patch.workbooks)
+    saveState(workspaceKey(workspaceId, "workbooks"), slice.workbooks);
+  if (patch.reports)
+    saveState(workspaceKey(workspaceId, "reports"), slice.reports);
+  if (patch.experiments)
+    saveState(workspaceKey(workspaceId, "experiments"), slice.experiments);
+  if (patch.syncRunsBySource)
+    saveState(workspaceKey(workspaceId, "syncRuns"), slice.syncRunsBySource);
 }
 
 /**
@@ -186,19 +278,28 @@ function reportToWorkbook(report: Report): Workbook {
 /** Every card the Home-page grid shows, reports and explorations both, freshly merged — never a stored list of its own. */
 function listAllWorkbooks(workspaceId: string): Workbook[] {
   const slice = getSlice(workspaceId);
-  return [...slice.reports.map(reportToWorkbook), ...slice.workbooks].sort((a, b) =>
-    b.updatedAt.localeCompare(a.updatedAt),
+  return [...slice.reports.map(reportToWorkbook), ...slice.workbooks].sort(
+    (a, b) => b.updatedAt.localeCompare(a.updatedAt),
   );
 }
 
-function matchesFilter(cell: string | number | undefined, filter: QueryFilter): boolean {
+function matchesFilter(
+  cell: string | number | undefined,
+  filter: QueryFilter,
+): boolean {
   switch (filter.operator) {
     case "eq":
-      return String(cell ?? "").toLowerCase() === String(filter.value).toLowerCase();
+      return (
+        String(cell ?? "").toLowerCase() === String(filter.value).toLowerCase()
+      );
     case "neq":
-      return String(cell ?? "").toLowerCase() !== String(filter.value).toLowerCase();
+      return (
+        String(cell ?? "").toLowerCase() !== String(filter.value).toLowerCase()
+      );
     case "contains":
-      return String(cell ?? "").toLowerCase().includes(String(filter.value).toLowerCase());
+      return String(cell ?? "")
+        .toLowerCase()
+        .includes(String(filter.value).toLowerCase());
     case "gt":
       return Number(cell) > Number(filter.value);
     case "gte":
@@ -221,11 +322,21 @@ function matchesFilter(cell: string | number | undefined, filter: QueryFilter): 
  * filtering by one) is left as a no-op rather than an error — there's
  * nothing wrong with the request, just nothing for it to restrict.
  */
-function applyFilters(result: QueryResult, filters: QueryFilter[] | undefined): QueryResult {
+function applyFilters(
+  result: QueryResult,
+  filters: QueryFilter[] | undefined,
+): QueryResult {
   if (!filters || filters.length === 0) return result;
-  const applicable = filters.filter((f) => result.columns.some((c) => c.key === f.column));
+  const applicable = filters.filter((f) =>
+    result.columns.some((c) => c.key === f.column),
+  );
   if (applicable.length === 0) return result;
-  return { ...result, rows: result.rows.filter((row) => applicable.every((f) => matchesFilter(row[f.column], f))) };
+  return {
+    ...result,
+    rows: result.rows.filter((row) =>
+      applicable.every((f) => matchesFilter(row[f.column], f)),
+    ),
+  };
 }
 
 const sourceLabels: Record<CreateDataSourceInput["type"], string> = {
@@ -259,7 +370,10 @@ export function resetMockData() {
   const keysToRemove: string[] = [];
   for (let i = 0; i < window.localStorage.length; i++) {
     const key = window.localStorage.key(i);
-    if (key && (key.startsWith("apicem.mock.") || key === "apicem.queryCache")) {
+    if (
+      key &&
+      (key.startsWith("apicem.mock.") || key === "apicem.queryCache")
+    ) {
       keysToRemove.push(key);
     }
   }
@@ -268,32 +382,132 @@ export function resetMockData() {
 }
 
 export const mockClient: ApiClient = {
+  async signUp() {
+    return wait(undefined);
+  },
+  async signIn() {
+    return wait(undefined);
+  },
+  async signOut() {
+    return wait(undefined);
+  },
+  async requestPasswordReset() {
+    return wait(undefined);
+  },
+  async updateWorkspace(name) {
+    const trimmedName = name.trim();
+    if (!trimmedName) throw new ApiError("Workspace name can't be empty", 400);
+    const override = { name: trimmedName, slug: slugify(trimmedName) };
+    workspaceOverrides[activeWorkspaceId] = override;
+    saveState(WORKSPACE_OVERRIDES_KEY, workspaceOverrides);
+    return wait({ ...getActiveBundle().workspace, ...override });
+  },
+  async updateProfile(name) {
+    const trimmedName = name.trim();
+    if (!trimmedName) throw new ApiError("Name can't be empty", 400);
+    profileName = trimmedName;
+    saveState(PROFILE_NAME_KEY, profileName);
+    return wait({
+      ...currentUser,
+      name: profileName,
+      role: getActiveBundle().myRole,
+    });
+  },
+  async changePassword(currentPassword, newPassword) {
+    if (!currentPassword || newPassword.length < 8) {
+      throw new ApiError(
+        "Enter your current password and a new password of at least 8 characters",
+        400,
+      );
+    }
+    return wait(undefined);
+  },
+  async updateMemberRole(userId, role) {
+    const member = getActiveBundle().members.find((item) => item.id === userId);
+    if (!member) throw new ApiError("Workspace member not found", 404);
+    if (member.role === "owner" || role === "owner") {
+      throw new ApiError("The workspace owner's role can't be changed", 403);
+    }
+    memberRoleOverrides[activeWorkspaceId] = {
+      ...memberRoleOverrides[activeWorkspaceId],
+      [userId]: role,
+    };
+    saveState(MEMBER_ROLE_OVERRIDES_KEY, memberRoleOverrides);
+    return wait(undefined);
+  },
+  async addTeamMember(input) {
+    const id = `usr_${Math.random().toString(36).slice(2, 9)}`;
+    const newMember: User = {
+      id,
+      name: input.email.split("@")[0],
+      email: input.email,
+      role: input.role ?? "viewer",
+      avatarColor: "#6366f1",
+    };
+    getActiveBundle().members.push(newMember);
+    return wait(newMember);
+  },
+  async removeTeamMember(userId) {
+    const bundle = getActiveBundle();
+    const idx = bundle.members.findIndex((m) => m.id === userId);
+    if (idx !== -1) {
+      bundle.members.splice(idx, 1);
+    }
+    return wait(undefined);
+  },
   async getCurrentUser() {
     const bundle = getActiveBundle();
-    return wait({ ...currentUser, role: bundle.myRole });
+    return wait({ ...currentUser, name: profileName, role: bundle.myRole });
   },
   async getCurrentWorkspace() {
     return wait(getActiveBundle().workspace);
   },
   async listTeamMembers() {
-    return wait(getActiveBundle().members);
+    return wait(
+      getActiveBundle().members.map((member) =>
+        member.id === currentUser.id
+          ? { ...member, name: profileName }
+          : member,
+      ),
+    );
   },
   async listMyWorkspaces() {
     // In a real backend this is "workspaces this session's user is a member
     // of" — the mock only ever has one user, so that's every bundle, seed or
     // custom.
-    return wait([...listWorkspaceSummaries(), ...Object.values(customBundles).map((b) => ({ id: b.workspace.id, name: b.workspace.name, slug: b.workspace.slug, plan: b.workspace.plan, myRole: b.myRole }))]);
+    return wait(
+      [
+        ...listWorkspaceSummaries(),
+        ...Object.values(customBundles).map((b) => ({
+          id: b.workspace.id,
+          name: b.workspace.name,
+          slug: b.workspace.slug,
+          plan: b.workspace.plan,
+          myRole: b.myRole,
+        })),
+      ].map((workspace) => ({
+        ...workspace,
+        ...workspaceOverrides[workspace.id],
+      })),
+    );
   },
   async switchWorkspace(workspaceId) {
     const bundle = getBundleFor(workspaceId);
-    if (!bundle) throw new ApiError(`Not a member of workspace "${workspaceId}"`, 403);
+    if (!bundle)
+      throw new ApiError(`Not a member of workspace "${workspaceId}"`, 403);
     activeWorkspaceId = workspaceId;
     saveState(ACTIVE_WORKSPACE_KEY, activeWorkspaceId);
     return wait(bundle.workspace);
   },
   async createWorkspace(input: CreateWorkspaceInput) {
     const id = `wksp_${Math.random().toString(36).slice(2, 9)}`;
-    const workspace: Workspace = { id, name: input.name, slug: slugify(input.name), plan: "starter", memberCount: 1 };
+    const workspace: Workspace = {
+      id,
+      name: input.name,
+      slug: slugify(input.name),
+      plan: "starter",
+      memberCount: 1,
+    };
     customBundles[id] = createEmptyBundle(workspace);
     customWorkspaces.push({ id, name: workspace.name, slug: workspace.slug });
     saveState(CUSTOM_WORKSPACES_KEY, customWorkspaces);
@@ -306,12 +520,14 @@ export const mockClient: ApiClient = {
     return wait(getSlice(activeWorkspaceId).dataSources);
   },
   async getDataSourceSchema(sourceId) {
-    const schema = getActiveBundle().schemaBySource[sourceId];
-    if (!schema) throw new ApiError(`No schema found for source "${sourceId}"`, 404);
+    const schema = getSlice(activeWorkspaceId).schemaBySource[sourceId];
+    if (!schema)
+      throw new ApiError(`No schema found for source "${sourceId}"`, 404);
     return wait(schema);
   },
   async createDataSource(input) {
     const workspaceId = activeWorkspaceId;
+    const schemaTables = getSchemaPreviewForType(input.type);
     const created: DataSource = {
       id: `src_${input.type}_${Math.random().toString(36).slice(2, 8)}`,
       workspaceId,
@@ -319,15 +535,29 @@ export const mockClient: ApiClient = {
       name: input.name || `New ${sourceLabels[input.type]} connection`,
       status: "syncing",
       lastSyncedAt: null,
-      tableCount: 0,
-      rowCount: 0,
+      tableCount: schemaTables.length,
+      rowCount: schemaTables.reduce(
+        (total, table) => total + table.rowCount,
+        0,
+      ),
     };
-    setSlice(workspaceId, { dataSources: [created, ...getSlice(workspaceId).dataSources] });
+    const slice = getSlice(workspaceId);
+    setSlice(workspaceId, {
+      dataSources: [created, ...slice.dataSources],
+      schemaBySource: {
+        ...slice.schemaBySource,
+        [created.id]: { sourceId: created.id, tables: schemaTables },
+      },
+    });
     return wait(created);
   },
   async removeDataSource(sourceId) {
     const workspaceId = activeWorkspaceId;
-    setSlice(workspaceId, { dataSources: getSlice(workspaceId).dataSources.filter((s) => s.id !== sourceId) });
+    setSlice(workspaceId, {
+      dataSources: getSlice(workspaceId).dataSources.filter(
+        (s) => s.id !== sourceId,
+      ),
+    });
     return wait(undefined);
   },
   async listSyncRuns(sourceId) {
@@ -345,7 +575,8 @@ export const mockClient: ApiClient = {
     // with no history) — the backend upserts on each row's natural key under
     // this key, so this attempt lands on the source's true row count rather
     // than adding to whatever the failed attempt already wrote.
-    const idempotencyKey = lastRun?.idempotencyKey ?? `sync_${sourceId}_${Date.now()}`;
+    const idempotencyKey =
+      lastRun?.idempotencyKey ?? `sync_${sourceId}_${Date.now()}`;
     const attempt = (lastRun?.attempt ?? 0) + 1;
     const targetRowCount = source.rowCount || 1_204_552;
 
@@ -361,9 +592,19 @@ export const mockClient: ApiClient = {
     };
 
     setSlice(workspaceId, {
-      syncRunsBySource: { ...slice.syncRunsBySource, [sourceId]: [newRun, ...priorRuns] },
+      syncRunsBySource: {
+        ...slice.syncRunsBySource,
+        [sourceId]: [newRun, ...priorRuns],
+      },
       dataSources: slice.dataSources.map((s) =>
-        s.id === sourceId ? { ...s, status: "connected", errorMessage: undefined, lastSyncedAt: newRun.finishedAt } : s,
+        s.id === sourceId
+          ? {
+              ...s,
+              status: "connected",
+              errorMessage: undefined,
+              lastSyncedAt: newRun.finishedAt,
+            }
+          : s,
       ),
     });
 
@@ -377,11 +618,19 @@ export const mockClient: ApiClient = {
     return wait(getActiveBundle().starterQuestions);
   },
   async runQuery(input: RunQueryInput) {
-    const result = getActiveBundle().resolveQuery(input.question, input.metricIds, input.dimensions);
+    const result = getActiveBundle().resolveQuery(
+      input.question,
+      input.metricIds,
+      input.dimensions,
+    );
     return wait(applyFilters(result, input.filters));
   },
   async runPivotQuery(input: RunPivotQueryInput) {
-    const result = getActiveBundle().pivotResult(input.metricIds, input.rowDimensions, input.columnDimensions);
+    const result = getActiveBundle().pivotResult(
+      input.metricIds,
+      input.rowDimensions,
+      input.columnDimensions,
+    );
     return wait(result);
   },
   async getBlockData(_source, key) {
@@ -394,8 +643,11 @@ export const mockClient: ApiClient = {
     return wait(listAllWorkbooks(activeWorkspaceId));
   },
   async getWorkbook(workbookId) {
-    const workbook = listAllWorkbooks(activeWorkspaceId).find((w) => w.id === workbookId);
-    if (!workbook) throw new ApiError(`Workbook "${workbookId}" not found`, 404);
+    const workbook = listAllWorkbooks(activeWorkspaceId).find(
+      (w) => w.id === workbookId,
+    );
+    if (!workbook)
+      throw new ApiError(`Workbook "${workbookId}" not found`, 404);
     return wait(workbook);
   },
   async createWorkbook(input: CreateWorkbookInput) {
@@ -410,12 +662,18 @@ export const mockClient: ApiClient = {
       folder: input.folder,
       query: input.query,
     };
-    setSlice(workspaceId, { workbooks: [created, ...getSlice(workspaceId).workbooks] });
+    setSlice(workspaceId, {
+      workbooks: [created, ...getSlice(workspaceId).workbooks],
+    });
     return wait(created);
   },
   async deleteWorkbook(workbookId) {
     const workspaceId = activeWorkspaceId;
-    setSlice(workspaceId, { workbooks: getSlice(workspaceId).workbooks.filter((w) => w.id !== workbookId) });
+    setSlice(workspaceId, {
+      workbooks: getSlice(workspaceId).workbooks.filter(
+        (w) => w.id !== workbookId,
+      ),
+    });
     return wait(undefined);
   },
   async recordWorkbookView(workbookId) {
@@ -428,11 +686,15 @@ export const mockClient: ApiClient = {
     // than throwing — a view "landing nowhere" isn't a caller error.
     if (slice.workbooks.some((w) => w.id === workbookId)) {
       setSlice(workspaceId, {
-        workbooks: slice.workbooks.map((w) => (w.id === workbookId ? { ...w, views: w.views + 1 } : w)),
+        workbooks: slice.workbooks.map((w) =>
+          w.id === workbookId ? { ...w, views: w.views + 1 } : w,
+        ),
       });
     } else if (slice.reports.some((r) => r.id === workbookId)) {
       setSlice(workspaceId, {
-        reports: slice.reports.map((r) => (r.id === workbookId ? { ...r, views: r.views + 1 } : r)),
+        reports: slice.reports.map((r) =>
+          r.id === workbookId ? { ...r, views: r.views + 1 } : r,
+        ),
       });
     }
     return wait(undefined);
@@ -441,7 +703,9 @@ export const mockClient: ApiClient = {
     return wait(getSlice(activeWorkspaceId).reports);
   },
   async getReport(reportId) {
-    const report = getSlice(activeWorkspaceId).reports.find((r) => r.id === reportId);
+    const report = getSlice(activeWorkspaceId).reports.find(
+      (r) => r.id === reportId,
+    );
     if (!report) throw new ApiError(`Report "${reportId}" not found`, 404);
     return wait(report);
   },
@@ -458,7 +722,9 @@ export const mockClient: ApiClient = {
       updatedAt: new Date().toISOString(),
       views: 0,
     };
-    setSlice(workspaceId, { reports: [created, ...getSlice(workspaceId).reports] });
+    setSlice(workspaceId, {
+      reports: [created, ...getSlice(workspaceId).reports],
+    });
     return wait(created);
   },
   async updateReport(reportId, input: UpdateReportInput) {
@@ -469,7 +735,9 @@ export const mockClient: ApiClient = {
       updated = {
         ...r,
         ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.description !== undefined
+          ? { description: input.description }
+          : {}),
         ...(input.blocks !== undefined ? { blocks: input.blocks } : {}),
         updatedAt: new Date().toISOString(),
       };
@@ -481,7 +749,9 @@ export const mockClient: ApiClient = {
   },
   async deleteReport(reportId) {
     const workspaceId = activeWorkspaceId;
-    setSlice(workspaceId, { reports: getSlice(workspaceId).reports.filter((r) => r.id !== reportId) });
+    setSlice(workspaceId, {
+      reports: getSlice(workspaceId).reports.filter((r) => r.id !== reportId),
+    });
     return wait(undefined);
   },
 
@@ -489,8 +759,11 @@ export const mockClient: ApiClient = {
     return wait(getSlice(activeWorkspaceId).experiments);
   },
   async getExperiment(experimentId) {
-    const experiment = getSlice(activeWorkspaceId).experiments.find((e) => e.id === experimentId);
-    if (!experiment) throw new ApiError(`Experiment "${experimentId}" not found`, 404);
+    const experiment = getSlice(activeWorkspaceId).experiments.find(
+      (e) => e.id === experimentId,
+    );
+    if (!experiment)
+      throw new ApiError(`Experiment "${experimentId}" not found`, 404);
     return wait(experiment);
   },
   async createExperiment(input: CreateExperimentInput) {
@@ -510,7 +783,9 @@ export const mockClient: ApiClient = {
       ownerId: currentUser.id,
       createdAt: new Date().toISOString(),
     };
-    setSlice(workspaceId, { experiments: [created, ...getSlice(workspaceId).experiments] });
+    setSlice(workspaceId, {
+      experiments: [created, ...getSlice(workspaceId).experiments],
+    });
     return wait(created);
   },
   async updateExperiment(experimentId, input: UpdateExperimentInput) {
@@ -521,23 +796,36 @@ export const mockClient: ApiClient = {
       updated = {
         ...e,
         ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.hypothesis !== undefined ? { hypothesis: input.hypothesis } : {}),
+        ...(input.hypothesis !== undefined
+          ? { hypothesis: input.hypothesis }
+          : {}),
         ...(input.metricId !== undefined ? { metricId: input.metricId } : {}),
         ...(input.unitType !== undefined ? { unitType: input.unitType } : {}),
-        ...(input.treatment !== undefined ? { treatment: { ...e.treatment, units: input.treatment.units } } : {}),
-        ...(input.holdout !== undefined ? { holdout: { ...e.holdout, units: input.holdout.units } } : {}),
-        ...(input.startDate !== undefined ? { startDate: input.startDate } : {}),
+        ...(input.treatment !== undefined
+          ? { treatment: { ...e.treatment, units: input.treatment.units } }
+          : {}),
+        ...(input.holdout !== undefined
+          ? { holdout: { ...e.holdout, units: input.holdout.units } }
+          : {}),
+        ...(input.startDate !== undefined
+          ? { startDate: input.startDate }
+          : {}),
         ...(input.endDate !== undefined ? { endDate: input.endDate } : {}),
       };
       return updated;
     });
-    if (!updated) throw new ApiError(`Experiment "${experimentId}" not found`, 404);
+    if (!updated)
+      throw new ApiError(`Experiment "${experimentId}" not found`, 404);
     setSlice(workspaceId, { experiments });
     return wait(updated);
   },
   async deleteExperiment(experimentId) {
     const workspaceId = activeWorkspaceId;
-    setSlice(workspaceId, { experiments: getSlice(workspaceId).experiments.filter((e) => e.id !== experimentId) });
+    setSlice(workspaceId, {
+      experiments: getSlice(workspaceId).experiments.filter(
+        (e) => e.id !== experimentId,
+      ),
+    });
     return wait(undefined);
   },
 };

@@ -8,7 +8,14 @@ import type { ApiClient } from "./types";
  * running. Set VITE_USE_MOCK=false (and VITE_API_BASE_URL) in .env.local
  * once the backend is up.
  */
-const useMock = import.meta.env.VITE_USE_MOCK !== "false";
+export const isMockMode = import.meta.env.VITE_USE_MOCK !== "false";
 
-export const apiClient: ApiClient = useMock ? mockClient : realClient;
-export const isMockMode = useMock;
+export const apiClient: ApiClient = new Proxy({} as ApiClient, {
+  get(_target, prop) {
+    const isMock = import.meta.env.VITE_USE_MOCK !== "false";
+    const client = isMock ? mockClient : realClient;
+    return (client as any)[prop];
+  },
+});
+
+export { getStoredToken } from "./real/adapter";

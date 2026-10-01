@@ -698,6 +698,41 @@ const northwindPresets: Record<string, QueryResult> = {
     sql: "select category, avg((price - cost) / nullif(price,0)) * 100 as margin\nfrom shopify.products group by 1 order by 2 desc",
     summary: "Average gross margin by product category across the current catalog.",
   },
+  campaign_perf: {
+    columns: [
+      { key: "campaign", label: "Campaign", type: "string" },
+      { key: "spend", label: "Spend", type: "currency" },
+      { key: "roas", label: "ROAS", type: "number" },
+    ],
+    rows: [
+      { campaign: "Summer Sale Search", spend: 14_200, roas: 3.8 },
+      { campaign: "Retargeting Meta", spend: 9_800, roas: 4.2 },
+      { campaign: "Brand Search Google", spend: 5_100, roas: 6.1 },
+      { campaign: "Prospecting Lookalike", spend: 11_400, roas: 2.4 },
+    ],
+    chartSuggestion: "bar",
+    confidence: 0.93,
+    sql: "select campaign_name as campaign, sum(spend) as spend, sum(conversion_value)/nullif(sum(spend),0) as roas from marts.fct_ad_spend group by 1 order by 2 desc",
+    summary: "Ad spend and ROAS breakdown by marketing campaign.",
+  },
+  date_trend: {
+    columns: [
+      { key: "date", label: "Date", type: "date" },
+      { key: "revenue", label: "Net Revenue", type: "currency" },
+    ],
+    rows: [
+      { date: "2026-09-25", revenue: 9_820 },
+      { date: "2026-09-26", revenue: 11_450 },
+      { date: "2026-09-27", revenue: 10_910 },
+      { date: "2026-09-28", revenue: 12_300 },
+      { date: "2026-09-29", revenue: 13_150 },
+      { date: "2026-09-30", revenue: 14_200 },
+    ],
+    chartSuggestion: "line",
+    confidence: 0.95,
+    sql: "select date_key as date, sum(net_revenue) as revenue from marts.fct_revenue_daily group by 1 order by 1",
+    summary: "Daily net revenue trend.",
+  },
 };
 
 const northwindQueryEngine = createQueryEngine(
@@ -715,7 +750,7 @@ const northwindQueryEngine = createQueryEngine(
   },
   northwindPresets,
   northwindStarterQuestions,
-  { channel: "cac_channel", category: "margin_category", product: "top_products" },
+  { channel: "cac_channel", category: "margin_category", product: "top_products", campaign: "campaign_perf", date: "date_trend" },
 );
 
 const northwindReportBlocksSeed = [
@@ -961,7 +996,7 @@ const auroraQueryEngine = createQueryEngine(
   },
   auroraPresets,
   auroraStarterQuestions,
-  { channel: "aurora_cac_channel" },
+  { channel: "aurora_cac_channel", category: "margin_category", product: "top_products", campaign: "campaign_perf", date: "date_trend" },
 );
 
 const auroraReports: Report[] = [

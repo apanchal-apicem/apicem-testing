@@ -3,6 +3,7 @@
 // two as equivalent, so without a rank check an admin could remove/outrank any owner.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { reset as resetRateLimit } from "../src/rateLimit.js";
 import { addViewer, authHeader, api, cleanupTenant, resetRateLimitBetweenTests, signUp, type SignedUpTenant } from "./helpers.js";
 
 resetRateLimitBetweenTests(beforeEach);
@@ -11,6 +12,7 @@ describe("team", () => {
   let tenant: SignedUpTenant;
 
   beforeEach(async () => {
+    resetRateLimit();
     tenant = await signUp();
   });
 
@@ -123,5 +125,25 @@ describe("team", () => {
     // ...and they can't remove themselves either (self-removal check) -- no path to zero owners.
     const selfAttempt = await api.delete(`/team/${secondOwner.user_id}`).set(secondOwnerHeaders);
     expect(selfAttempt.status).toBe(400);
+  });
+
+  it("an owner can update a teammate's role", async () => {
+    const memberEmail = `update-role-${tenant.email}`;
+    const add = await api
+      .post("/team")
+      .set(authHeader(tenant))
+      .send({ email: memberEmail, password: "password123", role: "viewer" });
+    expect(add.status).toBe(201);
+    const memberId = add.body.user_id;
+
+    const patchRes = await api
+      .patch(`/team/${memberId}`)
+      .set(authHeader(tenant))
+      .send({ role: "admin" });
+    expect(patchRes.status).toBe(204);
+
+    const teamList = await api.get("/team").set(authHeader(tenant));
+    const updated = teamList.body.find((m: { user_id: string }) => m.user_id === memberId);
+    expect(updated?.role).toBe("admin");
   });
 });

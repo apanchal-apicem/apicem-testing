@@ -1,6 +1,16 @@
 import { useState, type PointerEvent } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Building2, Check, ChevronsLeft, ChevronsRight, FilePlus2, FlaskConical, Plug, Plus, Sparkles } from "lucide-react";
+import {
+  Building2,
+  Check,
+  ChevronsLeft,
+  ChevronsRight,
+  FilePlus2,
+  FlaskConical,
+  Plug,
+  Plus,
+  Sparkles,
+} from "lucide-react";
 import { primaryNav, secondaryNav } from "./nav-config";
 import { BrandMark, ProductLabel } from "./brand-mark";
 import { ThemeToggle } from "./theme-toggle";
@@ -13,28 +23,52 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { CreateWorkspaceDialog } from "@/features/workspaces/create-workspace-dialog";
-import { useCurrentUser, useCurrentWorkspace, useMyWorkspaces, useSwitchWorkspace } from "@/api/hooks";
+import {
+  useCurrentUser,
+  useCurrentWorkspace,
+  useMyWorkspaces,
+  useSwitchWorkspace,
+} from "@/api/hooks";
 import { queryClient } from "@/api/query-client";
 import { prefetchRoute } from "@/route-prefetch";
-import { useSidebarStore } from "@/stores/sidebar";
-import { useAuthStore } from "@/stores/auth";
+import {
+  signOut,
+  sidebarActions,
+  useAppDispatch,
+  useAppSelector,
+} from "@/store";
 import { cn } from "@/lib/utils";
 
-function NavRow({ label, to, icon: Icon, collapsed }: { label: string; to: string; icon: typeof Sparkles; collapsed?: boolean }) {
+function NavRow({
+  label,
+  to,
+  icon: Icon,
+  collapsed,
+}: {
+  label: string;
+  to: string;
+  icon: typeof Sparkles;
+  collapsed?: boolean;
+}) {
   const link = (
     <NavLink
       to={to}
       end={to === "/"}
       aria-label={collapsed ? label : undefined}
-      onMouseEnter={() => prefetchRoute(to, queryClient)}
       onFocus={() => prefetchRoute(to, queryClient)}
       className={({ isActive }) =>
         cn(
           "flex items-center gap-2.5 rounded-(--radius-sm) px-3 py-2 text-[13.5px] font-medium transition-colors",
           collapsed && "justify-center px-0",
-          isActive ? "bg-primary text-primary-ink" : "text-ink-soft hover:bg-surface-2 hover:text-ink",
+          isActive
+            ? "bg-primary text-primary-ink"
+            : "text-ink-soft hover:bg-surface-2 hover:text-ink",
         )
       }
     >
@@ -53,7 +87,12 @@ function NavRow({ label, to, icon: Icon, collapsed }: { label: string; to: strin
   );
 }
 
-const roleLabel: Record<string, string> = { owner: "Owner", admin: "Admin", editor: "Editor", viewer: "Viewer" };
+const roleLabel: Record<string, string> = {
+  owner: "Owner",
+  admin: "Admin",
+  editor: "Editor",
+  viewer: "Viewer",
+};
 
 /**
  * The actual nav — brand mark, New menu, links, workspace switcher, theme
@@ -80,8 +119,14 @@ export function SidebarContent({
   const switchWorkspace = useSwitchWorkspace();
   const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
   const navigate = useNavigate();
-  const { toggleCollapsed } = useSidebarStore();
-  const signOut = useAuthStore((s) => s.signOut);
+  const dispatch = useAppDispatch();
+  const sidebarCollapsed = useAppSelector((state) => state.sidebar.collapsed);
+
+  function toggleCollapsed() {
+    const next = !sidebarCollapsed;
+    window.localStorage.setItem("apicem.sidebarCollapsed", next ? "1" : "0");
+    dispatch(sidebarActions.setSidebarCollapsed(next));
+  }
 
   function handleSwitch(workspaceId: string) {
     if (workspaceId === workspace?.id) return;
@@ -109,14 +154,24 @@ export function SidebarContent({
       aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       className="flex size-7 shrink-0 items-center justify-center rounded-full text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
     >
-      {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
+      {collapsed ? (
+        <ChevronsRight className="size-4" />
+      ) : (
+        <ChevronsLeft className="size-4" />
+      )}
     </button>
   );
 
   return (
-    <div className="flex h-full w-full flex-col px-3 py-4" onPointerDown={handleBackgroundClick}>
+    <div
+      className="flex h-full w-full flex-col px-3 py-4"
+      onPointerDown={handleBackgroundClick}
+    >
       <div
-        className={cn("flex items-center gap-2 pb-5", collapsed ? "justify-center px-0" : "px-2 justify-between")}
+        className={cn(
+          "flex items-center gap-2 pb-5",
+          collapsed ? "justify-center px-0" : "px-2 justify-between",
+        )}
         onPointerDown={handleBackgroundClick}
       >
         {!collapsed && (
@@ -127,7 +182,9 @@ export function SidebarContent({
         )}
         <Tooltip>
           <TooltipTrigger asChild>{collapseToggle}</TooltipTrigger>
-          <TooltipContent side="right">{collapsed ? "Expand sidebar" : "Collapse sidebar"}</TooltipContent>
+          <TooltipContent side="right">
+            {collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          </TooltipContent>
         </Tooltip>
       </div>
 
@@ -156,7 +213,10 @@ export function SidebarContent({
         )}
         <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuLabel>Create</DropdownMenuLabel>
-          <DropdownMenuItem onSelect={() => navigate("/explore")} onMouseEnter={() => prefetchRoute("/explore", queryClient)}>
+          <DropdownMenuItem
+            onSelect={() => navigate("/explore")}
+            onMouseEnter={() => prefetchRoute("/explore", queryClient)}
+          >
             <Sparkles className="size-4 text-ink-soft" />
             Ask a question
           </DropdownMenuItem>
@@ -184,7 +244,10 @@ export function SidebarContent({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <nav className="flex flex-1 flex-col gap-0.5" onPointerDown={handleBackgroundClick}>
+      <nav
+        className="flex flex-1 flex-col gap-0.5"
+        onPointerDown={handleBackgroundClick}
+      >
         {primaryNav.map((item) => (
           <NavRow key={item.to} {...item} collapsed={collapsed} />
         ))}
@@ -194,7 +257,10 @@ export function SidebarContent({
         ))}
       </nav>
 
-      <div className="mt-3 flex flex-col gap-2" onPointerDown={handleBackgroundClick}>
+      <div
+        className="mt-3 flex flex-col gap-2"
+        onPointerDown={handleBackgroundClick}
+      >
         <ThemeToggle className="self-center" iconOnly={collapsed} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -205,11 +271,17 @@ export function SidebarContent({
                 collapsed ? "justify-center px-0" : "px-2",
               )}
             >
-              {user && <Avatar name={user.name} color={user.avatarColor} size={30} />}
+              {user && (
+                <Avatar name={user.name} color={user.avatarColor} size={30} />
+              )}
               {!collapsed && (
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium text-ink">{user?.name ?? "Unnamed"}</span>
-                  <span className="block truncate text-[11.5px] text-ink-faint">{workspace?.name ?? "Unnamed workspace"}</span>
+                  <span className="block truncate text-[13px] font-medium text-ink">
+                    {user?.name ?? "Unnamed"}
+                  </span>
+                  <span className="block truncate text-[11.5px] text-ink-faint">
+                    {workspace?.name ?? "Unnamed workspace"}
+                  </span>
                 </span>
               )}
             </button>
@@ -218,7 +290,10 @@ export function SidebarContent({
             <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
             <div className="scrollbar-thin max-h-48 overflow-y-auto">
               {myWorkspaces.map((w) => (
-                <DropdownMenuItem key={w.id} onSelect={() => handleSwitch(w.id)}>
+                <DropdownMenuItem
+                  key={w.id}
+                  onSelect={() => handleSwitch(w.id)}
+                >
                   <Building2 className="size-3.5 shrink-0 text-ink-soft" />
                   <span className="min-w-0 flex-1 truncate">{w.name}</span>
                   {w.id === workspace?.id ? (
@@ -237,13 +312,20 @@ export function SidebarContent({
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>{workspace?.name}</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={() => navigate("/settings")}>Workspace settings</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate("/settings?tab=members")}>Members & roles</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate("/settings")}>
+              Workspace settings
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => navigate("/settings?tab=members")}
+            >
+              Members & roles
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onSelect={() => {
-                signOut();
-                navigate("/login", { replace: true });
+                void dispatch(signOut()).finally(() =>
+                  navigate("/login", { replace: true }),
+                );
               }}
             >
               Sign out
@@ -252,14 +334,18 @@ export function SidebarContent({
         </DropdownMenu>
       </div>
 
-      <CreateWorkspaceDialog open={createWorkspaceOpen} onOpenChange={setCreateWorkspaceOpen} onCreated={() => navigate("/")} />
+      <CreateWorkspaceDialog
+        open={createWorkspaceOpen}
+        onOpenChange={setCreateWorkspaceOpen}
+        onCreated={() => navigate("/")}
+      />
     </div>
   );
 }
 
 /** The always-visible rail at desktop widths (lg and up). Hidden below that — see MobileNavDrawer. */
 export function Sidebar() {
-  const { collapsed } = useSidebarStore();
+  const collapsed = useAppSelector((state) => state.sidebar.collapsed);
   return (
     <aside
       className={cn(

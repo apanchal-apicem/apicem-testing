@@ -6,6 +6,7 @@ import type {
   CreateReportInput,
   CreateWorkbookInput,
   CreateWorkspaceInput,
+  Role,
   ReportBlock,
   RunPivotQueryInput,
   RunQueryInput,
@@ -13,40 +14,37 @@ import type {
   UpdateReportInput,
 } from "@apicem/api-contract";
 import { apiClient } from "./client";
+import { queryKeys } from "./query-keys";
 import { STALE_TIME, queryPersister } from "./query-client";
 
-export const queryKeys = {
-  me: ["me"] as const,
-  workspace: ["workspace"] as const,
-  myWorkspaces: ["my-workspaces"] as const,
-  members: ["members"] as const,
-  dataSources: ["data-sources"] as const,
-  schema: (sourceId: string) => ["data-sources", sourceId, "schema"] as const,
-  syncRuns: (sourceId: string) => ["data-sources", sourceId, "sync-runs"] as const,
-  metrics: ["metrics"] as const,
-  starterQuestions: ["starter-questions"] as const,
-  workbooks: ["workbooks"] as const,
-  workbook: (id: string) => ["workbooks", id] as const,
-  reports: ["reports"] as const,
-  report: (id: string) => ["reports", id] as const,
-  experiments: ["experiments"] as const,
-  experiment: (id: string) => ["experiments", id] as const,
-};
+export { queryKeys };
 
 export function useCurrentUser() {
-  return useQuery({ queryKey: queryKeys.me, queryFn: apiClient.getCurrentUser });
+  return useQuery({
+    queryKey: queryKeys.me,
+    queryFn: apiClient.getCurrentUser,
+  });
 }
 
 export function useCurrentWorkspace() {
-  return useQuery({ queryKey: queryKeys.workspace, queryFn: apiClient.getCurrentWorkspace });
+  return useQuery({
+    queryKey: queryKeys.workspace,
+    queryFn: apiClient.getCurrentWorkspace,
+  });
 }
 
 export function useTeamMembers() {
-  return useQuery({ queryKey: queryKeys.members, queryFn: apiClient.listTeamMembers });
+  return useQuery({
+    queryKey: queryKeys.members,
+    queryFn: apiClient.listTeamMembers,
+  });
 }
 
 export function useMyWorkspaces() {
-  return useQuery({ queryKey: queryKeys.myWorkspaces, queryFn: apiClient.listMyWorkspaces });
+  return useQuery({
+    queryKey: queryKeys.myWorkspaces,
+    queryFn: apiClient.listMyWorkspaces,
+  });
 }
 
 /**
@@ -67,7 +65,9 @@ export function useMyWorkspaces() {
  * rather than ever risking painting one workspace's cached data under
  * another's screen.
  */
-async function clearWorkspaceScopedCache(qc: ReturnType<typeof useQueryClient>) {
+async function clearWorkspaceScopedCache(
+  qc: ReturnType<typeof useQueryClient>,
+) {
   qc.clear();
   await queryPersister.removeClient();
 }
@@ -83,17 +83,87 @@ export function useSwitchWorkspace() {
 export function useCreateWorkspace() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateWorkspaceInput) => apiClient.createWorkspace(input),
+    mutationFn: (input: CreateWorkspaceInput) =>
+      apiClient.createWorkspace(input),
     // Creating a workspace also switches into it (see the mock and the real
     // adapter's contract) — same reasoning as useSwitchWorkspace above.
     onSuccess: () => clearWorkspaceScopedCache(qc),
   });
 }
 
+export function useUpdateWorkspace() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => apiClient.updateWorkspace(name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.workspace });
+      qc.invalidateQueries({ queryKey: queryKeys.myWorkspaces });
+    },
+  });
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => apiClient.updateProfile(name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.me });
+      qc.invalidateQueries({ queryKey: queryKeys.members });
+    },
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (input: { currentPassword: string; newPassword: string }) =>
+      apiClient.changePassword(input.currentPassword, input.newPassword),
+  });
+}
+
+export function useUpdateMemberRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { userId: string; role: Role }) =>
+      apiClient.updateMemberRole(input.userId, input.role),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.members });
+      qc.invalidateQueries({ queryKey: queryKeys.me });
+      qc.invalidateQueries({ queryKey: queryKeys.myWorkspaces });
+    },
+  });
+}
+
+export function useAddTeamMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { email: string; password: string; role?: Role }) =>
+      apiClient.addTeamMember(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.members });
+      qc.invalidateQueries({ queryKey: queryKeys.workspace });
+    },
+  });
+}
+
+export function useRemoveTeamMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => apiClient.removeTeamMember(userId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.members });
+      qc.invalidateQueries({ queryKey: queryKeys.workspace });
+    },
+  });
+}
+
 export function useDataSources() {
   // LIVE tier: sync status can change from a background job the current
   // user didn't trigger — see STALE_TIME's doc comment.
-  return useQuery({ queryKey: queryKeys.dataSources, queryFn: apiClient.listDataSources, staleTime: STALE_TIME.LIVE });
+  return useQuery({
+    queryKey: queryKeys.dataSources,
+    queryFn: apiClient.listDataSources,
+    staleTime: STALE_TIME.LIVE,
+  });
 }
 
 export function useDataSourceSchema(sourceId: string | undefined) {
@@ -107,7 +177,8 @@ export function useDataSourceSchema(sourceId: string | undefined) {
 export function useCreateDataSource() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateDataSourceInput) => apiClient.createDataSource(input),
+    mutationFn: (input: CreateDataSourceInput) =>
+      apiClient.createDataSource(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.dataSources }),
   });
 }
@@ -141,14 +212,23 @@ export function useRetrySync(sourceId: string) {
 }
 
 export function useMetrics() {
-  return useQuery({ queryKey: queryKeys.metrics, queryFn: apiClient.listMetrics });
+  return useQuery({
+    queryKey: queryKeys.metrics,
+    queryFn: apiClient.listMetrics,
+  });
 }
 
 export function useStarterQuestions() {
-  return useQuery({ queryKey: queryKeys.starterQuestions, queryFn: apiClient.listStarterQuestions });
+  return useQuery({
+    queryKey: queryKeys.starterQuestions,
+    queryFn: apiClient.listStarterQuestions,
+  });
 }
 
-export function useBlockData(source: "metric" | "preset" | undefined, key: string | undefined) {
+export function useBlockData(
+  source: "metric" | "preset" | undefined,
+  key: string | undefined,
+) {
   return useQuery({
     queryKey: ["block-data", source, key] as const,
     queryFn: () => apiClient.getBlockData(source!, key!),
@@ -166,10 +246,20 @@ export function useRunQuery() {
 }
 
 /** A pivot report block's live data — a query, not the mutation Explore's own Pivot tab uses, so a saved block auto-fetches and caches the same way any other block's useBlockData does, instead of needing something to dispatch a "run" on mount. */
-export function usePivotBlockData(metricIds: string[], rowDimensions: string[], columnDimensions: string[]) {
+export function usePivotBlockData(
+  metricIds: string[],
+  rowDimensions: string[],
+  columnDimensions: string[],
+) {
   return useQuery({
-    queryKey: ["pivot-block-data", metricIds, rowDimensions, columnDimensions] as const,
-    queryFn: () => apiClient.runPivotQuery({ metricIds, rowDimensions, columnDimensions }),
+    queryKey: [
+      "pivot-block-data",
+      metricIds,
+      rowDimensions,
+      columnDimensions,
+    ] as const,
+    queryFn: () =>
+      apiClient.runPivotQuery({ metricIds, rowDimensions, columnDimensions }),
     staleTime: STALE_TIME.LIVE,
   });
 }
@@ -181,7 +271,10 @@ export function useRunPivotQuery() {
 }
 
 export function useWorkbooks() {
-  return useQuery({ queryKey: queryKeys.workbooks, queryFn: apiClient.listWorkbooks });
+  return useQuery({
+    queryKey: queryKeys.workbooks,
+    queryFn: apiClient.listWorkbooks,
+  });
 }
 
 export function useWorkbook(workbookId: string | undefined) {
@@ -217,7 +310,8 @@ export function useDeleteWorkbook() {
 export function useRecordWorkbookView() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (workbookId: string) => apiClient.recordWorkbookView(workbookId),
+    mutationFn: (workbookId: string) =>
+      apiClient.recordWorkbookView(workbookId),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.workbooks }),
   });
 }
@@ -244,7 +338,10 @@ export function useRecordWorkbookViewOnce(id: string | undefined) {
 }
 
 export function useReports() {
-  return useQuery({ queryKey: queryKeys.reports, queryFn: apiClient.listReports });
+  return useQuery({
+    queryKey: queryKeys.reports,
+    queryFn: apiClient.listReports,
+  });
 }
 
 export function useReport(reportId: string | undefined) {
@@ -266,7 +363,8 @@ export function useCreateReport() {
 export function useUpdateReport(reportId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: UpdateReportInput) => apiClient.updateReport(reportId, input),
+    mutationFn: (input: UpdateReportInput) =>
+      apiClient.updateReport(reportId, input),
     onSuccess: (updated) => {
       qc.setQueryData(queryKeys.report(reportId), updated);
       qc.invalidateQueries({ queryKey: queryKeys.reports });
@@ -278,9 +376,20 @@ export function useUpdateReport(reportId: string) {
 export function useAppendReportBlock() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ reportId, block }: { reportId: string; block: Omit<ReportBlock, "layout"> & { layout?: Partial<ReportBlock["layout"]> } }) => {
+    mutationFn: async ({
+      reportId,
+      block,
+    }: {
+      reportId: string;
+      block: Omit<ReportBlock, "layout"> & {
+        layout?: Partial<ReportBlock["layout"]>;
+      };
+    }) => {
       const report = await apiClient.getReport(reportId);
-      const maxY = report.blocks.reduce((acc, b) => Math.max(acc, b.layout.y + b.layout.h), 0);
+      const maxY = report.blocks.reduce(
+        (acc, b) => Math.max(acc, b.layout.y + b.layout.h),
+        0,
+      );
       const layout: ReportBlock["layout"] = {
         x: 0,
         y: maxY,
@@ -288,7 +397,10 @@ export function useAppendReportBlock() {
         h: 4,
         ...block.layout,
       };
-      const nextBlocks: ReportBlock[] = [...report.blocks, { ...block, layout }];
+      const nextBlocks: ReportBlock[] = [
+        ...report.blocks,
+        { ...block, layout },
+      ];
       return apiClient.updateReport(reportId, { blocks: nextBlocks });
     },
     onSuccess: (updated) => {
@@ -314,7 +426,10 @@ export function useDeleteReport() {
 }
 
 export function useExperiments() {
-  return useQuery({ queryKey: queryKeys.experiments, queryFn: apiClient.listExperiments });
+  return useQuery({
+    queryKey: queryKeys.experiments,
+    queryFn: apiClient.listExperiments,
+  });
 }
 
 export function useExperiment(experimentId: string | undefined) {
@@ -328,7 +443,8 @@ export function useExperiment(experimentId: string | undefined) {
 export function useCreateExperiment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateExperimentInput) => apiClient.createExperiment(input),
+    mutationFn: (input: CreateExperimentInput) =>
+      apiClient.createExperiment(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.experiments }),
   });
 }
@@ -336,7 +452,8 @@ export function useCreateExperiment() {
 export function useUpdateExperiment(experimentId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: UpdateExperimentInput) => apiClient.updateExperiment(experimentId, input),
+    mutationFn: (input: UpdateExperimentInput) =>
+      apiClient.updateExperiment(experimentId, input),
     onSuccess: (updated) => {
       qc.setQueryData(queryKeys.experiment(experimentId), updated);
       qc.invalidateQueries({ queryKey: queryKeys.experiments });
@@ -347,7 +464,8 @@ export function useUpdateExperiment(experimentId: string) {
 export function useDeleteExperiment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (experimentId: string) => apiClient.deleteExperiment(experimentId),
+    mutationFn: (experimentId: string) =>
+      apiClient.deleteExperiment(experimentId),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.experiments }),
   });
 }

@@ -12,20 +12,20 @@ idempotent by construction) and what's still open before a real launch. See
 **PERFORMANCE.md** for why navigating around this app doesn't cost a network
 round trip most of the time, and what to keep true as it grows.
 
-This repo currently holds the **frontend** (`apps/web`), built against
-realistic fixture data so it runs standalone with no backend. The backend
-lands in `apps/api` (or wherever your infra prefers) and plugs in by
-implementing the REST surface documented in
-`apps/web/src/api/real/adapter.ts` — see **Plugging in the real backend**
 below.
+This folder holds the **frontend** (`apps/web`), built against realistic
+fixture data so it can run standalone. The sibling `../backend` contains the
+FastAPI service; its V1 routes are being connected incrementally through the
+REST contract in `apps/web/src/api/real/adapter.ts`.
 
 ## Stack
 
 - **React 19 + Vite 8 + TypeScript**, strict mode
 - **Tailwind CSS v4** (CSS-first config, tokens in `apps/web/src/styles/theme.css`)
 - **Radix UI** primitives (dialog, dropdown, tabs, select, popover, switch, tooltip)
-- **TanStack Query** for all server state
-- **Zustand** for local UI state (theme preference, report-builder canvas)
+- **TanStack Query** for server state and caching
+- **Redux Toolkit** for shared client state (auth status, theme, sidebar, report-builder canvas)
+- **Axios** for real-backend HTTP requests
 - **dnd-kit** for the report builder's drag-and-drop canvas
 - **Recharts** for charts
 - **npm workspaces** monorepo (`apps/*`, `packages/*`)
@@ -129,8 +129,8 @@ apps/
         client.ts            picks mock vs real based on VITE_USE_MOCK
         hooks.ts             every React Query hook the app uses
         mock/                fixture data + mock adapter (in-memory + localStorage)
-        real/                fetch-based adapter for the real backend
-      stores/               zustand stores
+        real/                Axios adapter for the real backend
+      store.ts               Redux Toolkit store and slices
 packages/
   api-contract/           shared TypeScript types + zod schemas for request bodies —
                           import this from the backend once it exists, so both sides

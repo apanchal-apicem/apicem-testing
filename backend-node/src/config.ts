@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT_ENV = path.join(__dirname, "..", "..", ".env");
-loadDotenv({ path: REPO_ROOT_ENV });
+loadDotenv({ path: REPO_ROOT_ENV, override: true });
 
 function env(name: string, fallback = ""): string {
   return process.env[name] ?? fallback;
@@ -34,6 +34,8 @@ export const settings = {
   jwtSecret: env("JWT_SECRET", "change_me_dev_only"),
   jwtAlgorithm: "HS256" as const,
   jwtExpiresMinutes: 60 * 24,
+
+  cookieSecure: env("COOKIE_SECURE", "false") === "true",
 
   // Used to envelope-encrypt connection credentials before they're stored in app.secrets
   // (doc Sec 2.2, 11). Real deployments should use AWS Secrets Manager/Vault instead.

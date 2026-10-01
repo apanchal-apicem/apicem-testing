@@ -24,6 +24,28 @@ describe("auth", () => {
     expect(response.body.role).toBe("owner");
   });
 
+  it("can update profile name and retrieve it via /auth/me", async () => {
+    const unauth = await api.patch("/auth/me").send({ name: "Jane Doe" });
+    expect(unauth.status).toBe(401);
+
+    const empty = await api
+      .patch("/auth/me")
+      .set(authHeader(tenant))
+      .send({ name: "   " });
+    expect(empty.status).toBe(400);
+
+    const update = await api
+      .patch("/auth/me")
+      .set(authHeader(tenant))
+      .send({ name: "Jane Doe" });
+    expect(update.status).toBe(200);
+    expect(update.body.name).toBe("Jane Doe");
+
+    const me = await api.get("/auth/me").set(authHeader(tenant));
+    expect(me.status).toBe(200);
+    expect(me.body.name).toBe("Jane Doe");
+  });
+
   it("signup with a duplicate email is rejected", async () => {
     const response = await api
       .post("/auth/signup")

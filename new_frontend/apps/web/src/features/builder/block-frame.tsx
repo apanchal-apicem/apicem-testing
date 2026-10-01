@@ -3,27 +3,45 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Trash2 } from "lucide-react";
 import type { ReportBlock } from "@apicem/api-contract";
-import { useBuilderStore } from "@/stores/builder";
-import { GRID_COLS, layoutToPixels, minSizeByType, pxToSize } from "./grid-utils";
+import { builderActions, useAppDispatch, useAppSelector } from "@/store";
+import {
+  GRID_COLS,
+  layoutToPixels,
+  minSizeByType,
+  pxToSize,
+} from "./grid-utils";
 import { BlockContent } from "./block-content";
 import { EditBlockPopover } from "./edit-block-popover";
 import { EditPivotBlockPopover } from "./edit-pivot-block-popover";
 import { cn } from "@/lib/utils";
 
-const editableBlockTypes = new Set<ReportBlock["type"]>(["kpi", "chart", "table"]);
+const editableBlockTypes = new Set<ReportBlock["type"]>([
+  "kpi",
+  "chart",
+  "table",
+]);
 
-export function BlockFrame({ block, colWidth }: { block: ReportBlock; colWidth: number }) {
-  const selectedId = useBuilderStore((s) => s.selectedId);
-  const selectBlock = useBuilderStore((s) => s.selectBlock);
-  const bringToFront = useBuilderStore((s) => s.bringToFront);
-  const updateBlock = useBuilderStore((s) => s.updateBlock);
-  const removeBlock = useBuilderStore((s) => s.removeBlock);
-  const resizeStart = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+export function BlockFrame({
+  block,
+  colWidth,
+}: {
+  block: ReportBlock;
+  colWidth: number;
+}) {
+  const dispatch = useAppDispatch();
+  const selectedId = useAppSelector((state) => state.builder.selectedId);
+  const resizeStart = useRef<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  } | null>(null);
 
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: block.id,
-    data: { kind: "existing" },
-  });
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: block.id,
+      data: { kind: "existing" },
+    });
 
   const pixels = layoutToPixels(block.layout, colWidth);
   const selected = selectedId === block.id;
@@ -32,18 +50,35 @@ export function BlockFrame({ block, colWidth }: { block: ReportBlock; colWidth: 
     e.stopPropagation();
     e.preventDefault();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    resizeStart.current = { x: e.clientX, y: e.clientY, w: pixels.width, h: pixels.height };
+    resizeStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      w: pixels.width,
+      h: pixels.height,
+    };
 
     function onMove(ev: PointerEvent) {
       if (!resizeStart.current) return;
       const dx = ev.clientX - resizeStart.current.x;
       const dy = ev.clientY - resizeStart.current.y;
-      const { w, h } = pxToSize(resizeStart.current.w + dx, resizeStart.current.h + dy, colWidth);
+      const { w, h } = pxToSize(
+        resizeStart.current.w + dx,
+        resizeStart.current.h + dy,
+        colWidth,
+      );
       const min = minSizeByType[block.type];
-      updateBlock(block.id, (b) => ({
-        ...b,
-        layout: { ...b.layout, w: Math.max(min.w, Math.min(12 - b.layout.x, w)), h: Math.max(min.h, h) },
-      }));
+      dispatch(
+        builderActions.updateBlock({
+          id: block.id,
+          patch: {
+            layout: {
+              ...block.layout,
+              w: Math.max(min.w, Math.min(12 - block.layout.x, w)),
+              h: Math.max(min.h, h),
+            },
+          },
+        }),
+      );
     }
     function onUp() {
       window.removeEventListener("pointermove", onMove);
@@ -72,19 +107,54 @@ export function BlockFrame({ block, colWidth }: { block: ReportBlock; colWidth: 
       switch (e.key) {
         case "ArrowLeft":
           e.preventDefault();
-          updateBlock(block.id, (b) => ({ ...b, layout: { ...b.layout, w: Math.max(min.w, b.layout.w - 1) } }));
+          dispatch(
+            builderActions.updateBlock({
+              id: block.id,
+              patch: {
+                layout: {
+                  ...block.layout,
+                  w: Math.max(min.w, block.layout.w - 1),
+                },
+              },
+            }),
+          );
           return;
         case "ArrowRight":
           e.preventDefault();
-          updateBlock(block.id, (b) => ({ ...b, layout: { ...b.layout, w: Math.min(GRID_COLS - b.layout.x, b.layout.w + 1) } }));
+          dispatch(
+            builderActions.updateBlock({
+              id: block.id,
+              patch: {
+                layout: {
+                  ...block.layout,
+                  w: Math.min(GRID_COLS - block.layout.x, block.layout.w + 1),
+                },
+              },
+            }),
+          );
           return;
         case "ArrowUp":
           e.preventDefault();
-          updateBlock(block.id, (b) => ({ ...b, layout: { ...b.layout, h: Math.max(min.h, b.layout.h - 1) } }));
+          dispatch(
+            builderActions.updateBlock({
+              id: block.id,
+              patch: {
+                layout: {
+                  ...block.layout,
+                  h: Math.max(min.h, block.layout.h - 1),
+                },
+              },
+            }),
+          );
           return;
         case "ArrowDown":
           e.preventDefault();
-          updateBlock(block.id, (b) => ({ ...b, layout: { ...b.layout, h: b.layout.h + 1 } }));
+          dispatch(
+            builderActions.updateBlock({
+              id: block.id,
+              patch: { layout: { ...block.layout, h: block.layout.h + 1 } },
+            }),
+          );
           return;
       }
     }
@@ -92,24 +162,53 @@ export function BlockFrame({ block, colWidth }: { block: ReportBlock; colWidth: 
     switch (e.key) {
       case "ArrowLeft":
         e.preventDefault();
-        updateBlock(block.id, (b) => ({ ...b, layout: { ...b.layout, x: Math.max(0, b.layout.x - 1) } }));
+        dispatch(
+          builderActions.updateBlock({
+            id: block.id,
+            patch: {
+              layout: { ...block.layout, x: Math.max(0, block.layout.x - 1) },
+            },
+          }),
+        );
         break;
       case "ArrowRight":
         e.preventDefault();
-        updateBlock(block.id, (b) => ({ ...b, layout: { ...b.layout, x: Math.min(GRID_COLS - b.layout.w, b.layout.x + 1) } }));
+        dispatch(
+          builderActions.updateBlock({
+            id: block.id,
+            patch: {
+              layout: {
+                ...block.layout,
+                x: Math.min(GRID_COLS - block.layout.w, block.layout.x + 1),
+              },
+            },
+          }),
+        );
         break;
       case "ArrowUp":
         e.preventDefault();
-        updateBlock(block.id, (b) => ({ ...b, layout: { ...b.layout, y: Math.max(0, b.layout.y - 1) } }));
+        dispatch(
+          builderActions.updateBlock({
+            id: block.id,
+            patch: {
+              layout: { ...block.layout, y: Math.max(0, block.layout.y - 1) },
+            },
+          }),
+        );
         break;
       case "ArrowDown":
         e.preventDefault();
-        updateBlock(block.id, (b) => ({ ...b, layout: { ...b.layout, y: b.layout.y + 1 } }));
+        dispatch(
+          builderActions.updateBlock({
+            id: block.id,
+            patch: { layout: { ...block.layout, y: block.layout.y + 1 } },
+          }),
+        );
         break;
       case "Delete":
       case "Backspace":
         e.preventDefault();
-        removeBlock(block.id);
+        dispatch(builderActions.removeBlock(block.id));
         break;
     }
   }
@@ -132,12 +231,12 @@ export function BlockFrame({ block, colWidth }: { block: ReportBlock; colWidth: 
       role="group"
       aria-label={`${block.type} block${selected ? ", selected. Arrow keys move, shift plus arrow keys resize, Delete removes" : ""}`}
       onPointerDown={() => {
-        selectBlock(block.id);
-        bringToFront(block.id);
+        dispatch(builderActions.selectBlock(block.id));
+        dispatch(builderActions.bringToFront(block.id));
       }}
       onFocus={() => {
-        selectBlock(block.id);
-        bringToFront(block.id);
+        dispatch(builderActions.selectBlock(block.id));
+        dispatch(builderActions.bringToFront(block.id));
       }}
       onKeyDown={handleFrameKeyDown}
       style={{
@@ -151,7 +250,9 @@ export function BlockFrame({ block, colWidth }: { block: ReportBlock; colWidth: 
       }}
       className={cn(
         "group rounded-(--radius-md) border bg-surface transition-shadow",
-        selected ? "border-accent shadow-lg" : "border-border hover:border-border-strong",
+        selected
+          ? "border-accent shadow-lg"
+          : "border-border hover:border-border-strong",
         isDragging && "opacity-70",
       )}
     >
@@ -168,14 +269,18 @@ export function BlockFrame({ block, colWidth }: { block: ReportBlock; colWidth: 
         {block.type}
       </div>
 
-      {selected && editableBlockTypes.has(block.type) && <EditBlockPopover block={block} />}
-      {selected && block.type === "pivot" && <EditPivotBlockPopover block={block} />}
+      {selected && editableBlockTypes.has(block.type) && (
+        <EditBlockPopover block={block} />
+      )}
+      {selected && block.type === "pivot" && (
+        <EditPivotBlockPopover block={block} />
+      )}
 
       {selected && (
         <button
           onClick={(e) => {
             e.stopPropagation();
-            removeBlock(block.id);
+            dispatch(builderActions.removeBlock(block.id));
           }}
           aria-label={`Remove ${block.type} block`}
           className="absolute -top-3 right-2 z-10 flex size-5 items-center justify-center rounded-full border border-border bg-surface text-danger transition-colors hover:bg-danger hover:text-primary-ink"

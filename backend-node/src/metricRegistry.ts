@@ -89,6 +89,22 @@ export const SCALAR_METRICS: Record<string, ScalarMetricDef> = {
           FROM marts.fct_orders
           WHERE tenant_id = $1 AND order_date_key BETWEEN $2 AND $3`,
   },
+  repeat_customer_rate: {
+    label: "Repeat Customer Rate",
+    format: "percent",
+    sql: `SELECT CASE WHEN coalesce(sum(order_count), 0) = 0 THEN 0
+                      ELSE round((sum(order_count) - sum(new_customer_count))::numeric / sum(order_count), 4) END AS value
+          FROM marts.fct_revenue_daily
+          WHERE tenant_id = $1 AND date_key BETWEEN $2 AND $3`,
+  },
+  refund_rate_pct: {
+    label: "Refund Rate %",
+    format: "percent",
+    sql: `SELECT CASE WHEN coalesce(sum(gross_revenue), 0) = 0 THEN 0
+                      ELSE round(sum(refund_amount) / sum(gross_revenue), 4) END AS value
+          FROM marts.fct_revenue_daily
+          WHERE tenant_id = $1 AND date_key BETWEEN $2 AND $3`,
+  },
   total_ad_spend: {
     label: "Total Ad Spend",
     format: "currency",
@@ -135,7 +151,7 @@ export const SCALAR_METRICS: Record<string, ScalarMetricDef> = {
     format: "currency",
     sql: `SELECT coalesce(sum(inventory_value), 0) AS value
           FROM marts.fct_inventory_snapshot
-          WHERE tenant_id = $1 AND date_key = (
+          WHERE tenant_id = $1 AND ($2::text IS NOT NULL OR true) AND date_key = (
               SELECT max(date_key) FROM marts.fct_inventory_snapshot
               WHERE tenant_id = $1 AND date_key <= $3
           )`,
@@ -145,7 +161,7 @@ export const SCALAR_METRICS: Record<string, ScalarMetricDef> = {
     format: "count",
     sql: `SELECT coalesce(sum(quantity_on_hand), 0) AS value
           FROM marts.fct_inventory_snapshot
-          WHERE tenant_id = $1 AND date_key = (
+          WHERE tenant_id = $1 AND ($2::text IS NOT NULL OR true) AND date_key = (
               SELECT max(date_key) FROM marts.fct_inventory_snapshot
               WHERE tenant_id = $1 AND date_key <= $3
           )`,
@@ -155,7 +171,7 @@ export const SCALAR_METRICS: Record<string, ScalarMetricDef> = {
     format: "count",
     sql: `SELECT count(*) AS value
           FROM marts.fct_inventory_snapshot
-          WHERE tenant_id = $1 AND quantity_available < 15 AND date_key = (
+          WHERE tenant_id = $1 AND ($2::text IS NOT NULL OR true) AND quantity_available < 15 AND date_key = (
               SELECT max(date_key) FROM marts.fct_inventory_snapshot
               WHERE tenant_id = $1 AND date_key <= $3
           )`,
@@ -229,7 +245,7 @@ export const TABLE_METRICS: Record<string, SeriesOrTableMetricDef> = {
     sql: `SELECT dp.product_name, dp.sku, fis.quantity_on_hand, fis.quantity_available, fis.inventory_value
           FROM marts.fct_inventory_snapshot fis
           JOIN marts.dim_product dp ON dp.product_key = fis.product_key AND dp.tenant_id = fis.tenant_id
-          WHERE fis.tenant_id = $1 AND fis.date_key = (
+          WHERE fis.tenant_id = $1 AND ($2::text IS NOT NULL OR true) AND fis.date_key = (
               SELECT max(date_key) FROM marts.fct_inventory_snapshot
               WHERE tenant_id = $1 AND date_key <= $3
           )

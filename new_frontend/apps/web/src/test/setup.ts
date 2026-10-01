@@ -1,6 +1,8 @@
 import "@testing-library/jest-dom/vitest";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
+
+vi.stubEnv("VITE_USE_MOCK", "true");
 
 // jsdom doesn't implement ResizeObserver. The report builder canvas and
 // Recharts' ResponsiveContainer both use it just to measure their own

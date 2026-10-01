@@ -53,9 +53,7 @@ class Settings(BaseSettings):
     # them before use); it never sees or states a number, so keeping this optional doesn't
     # weaken the "no LLM ever answers directly" guarantee the rest of the assistant relies on.
     groq_api_key: str = ""
-    # Confirmed available via Groq's /v1/models as of 2026-09-07 -- Groq's catalog has shifted
-    # entirely away from Llama 3.x models since; check `GET /v1/models` again if this 404s.
-    groq_model: str = "openai/gpt-oss-20b"
+    groq_model: str = "llama-3.3-70b-versatile"
 
     class Config:
         env_file = _REPO_ROOT_ENV

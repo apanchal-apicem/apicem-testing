@@ -3,12 +3,19 @@
 // never catch), disposable tagged tenants, an owner-role connection for RLS-bypassing
 // teardown/assertions.
 import { randomBytes } from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
+import { config as loadDotenv } from "dotenv";
 import pg from "pg";
 import request from "supertest";
 
 import { buildApp } from "../src/main.js";
 import { reset as resetRateLimit } from "../src/rateLimit.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT_ENV = path.join(__dirname, "..", "..", ".env");
+loadDotenv({ path: REPO_ROOT_ENV });
 
 export const TEST_EMAIL_MARKER = "apicem-vitest";
 
@@ -56,6 +63,7 @@ export interface SignedUpTenant extends SignupPayload {
 }
 
 export async function signUp(payload: SignupPayload = signupPayload()): Promise<SignedUpTenant> {
+  resetRateLimit();
   const response = await api.post("/auth/signup").send(payload);
   if (response.status !== 200) {
     throw new Error(`signup failed: ${response.status} ${JSON.stringify(response.body)}`);
@@ -75,6 +83,7 @@ export function authHeader(tenant: SignedUpTenant): { Authorization: string } {
 /** Adds a second, viewer-role user to the SAME tenant `signedUp` created, and returns their
  * auth header -- for testing that RBAC actually blocks the UI actions it's meant to. */
 export async function addViewer(owner: SignedUpTenant): Promise<{ Authorization: string }> {
+  resetRateLimit();
   const viewerEmail = `viewer-${owner.email}`;
   const created = await api
     .post("/team")
@@ -83,7 +92,11 @@ export async function addViewer(owner: SignedUpTenant): Promise<{ Authorization:
   if (created.status !== 201) {
     throw new Error(`add viewer failed: ${created.status} ${JSON.stringify(created.body)}`);
   }
+  resetRateLimit();
   const login = await api.post("/auth/login").send({ email: viewerEmail, password: "viewerpassword123" });
+  if (login.status !== 200) {
+    throw new Error(`login viewer failed: ${login.status} ${JSON.stringify(login.body)}`);
+  }
   return { Authorization: `Bearer ${login.body.access_token}` };
 }
 

@@ -56,7 +56,10 @@ export type DataSourceType =
   | "shopify"
   | "quickbooks"
   | "stripe"
-  | "square";
+  | "square"
+  | "google_ads"
+  | "meta_ads"
+  | "netsuite";
 
 export type DataSourceStatus = "connected" | "syncing" | "error" | "pending";
 
@@ -101,6 +104,14 @@ export interface Metric {
   category: MetricCategory;
   format: MetricFormat;
   sourceIds: string[];
+}
+
+export interface StarterQuestion {
+  id: string;
+  question: string;
+  hint: string;
+  category?: string;
+  suggestedMetricId?: string;
 }
 
 export type ChartType = "kpi" | "line" | "bar" | "area" | "table" | "donut";

@@ -3,10 +3,10 @@ apicem:
   outputs:
     dev:
       type: postgres
-      host: "{{ env_var('POSTGRES_HOST', 'postgres') }}"
+      host: "{{ env_var('POSTGRES_HOST', 'localhost') }}"
       port: "{{ env_var('POSTGRES_PORT', '5432') | as_number }}"
       user: "{{ env_var('POSTGRES_USER', 'apicem') }}"
-      password: "{{ env_var('POSTGRES_PASSWORD', 'apicem_dev_password') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD', 'Root123') }}"
       dbname: "{{ env_var('POSTGRES_DB', 'apicem') }}"
       schema: raw
       threads: 4

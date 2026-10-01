@@ -348,7 +348,7 @@ function BuildTab({
       <div className="space-y-5">
         <div>
           <p className="mb-2 text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">Metrics</p>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-2 scrollbar-thin">
             {metricFields.map((f) => (
               <FieldChip
                 key={f.id}
@@ -485,7 +485,7 @@ function PivotTab() {
       <div className="space-y-5">
         <div>
           <p className="mb-2 text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">Metrics</p>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-2 scrollbar-thin">
             {metricFields.map((f) => (
               <FieldChip key={f.id} field={f} onSelect={(field) => addUnique(setValueFields, field)} />
             ))}

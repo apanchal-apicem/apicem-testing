@@ -1,7 +1,34 @@
+# Environment and secrets
 .env
-__pycache__/
-*.pyc
+.env.*
+!.env.example
 .venv/
+.venv*/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Node.js
+node_modules/
+dist/
+dist-ssr/
+*.local
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # dbt
 warehouse/dbt/dbt_packages/
@@ -9,10 +36,11 @@ warehouse/dbt/target/
 warehouse/dbt/logs/
 warehouse/dbt/package-lock.yml
 
-# frontend
+# legacy frontend
 frontend/node_modules/
 frontend/dist/
 frontend/tsconfig.tsbuildinfo
 
 # editors/OS
 .DS_Store
+.idea/

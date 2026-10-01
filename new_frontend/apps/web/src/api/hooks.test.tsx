@@ -8,8 +8,20 @@ import type { ReactNode } from "react";
 // isn't checked against the real module's type.
 vi.mock("./client", () => ({
   apiClient: {
-    switchWorkspace: vi.fn().mockResolvedValue({ id: "wksp_aurora", name: "Aurora", slug: "aurora", plan: "starter", memberCount: 1 }),
-    createWorkspace: vi.fn().mockResolvedValue({ id: "wksp_new", name: "New Client", slug: "new-client", plan: "starter", memberCount: 1 }),
+    switchWorkspace: vi.fn().mockResolvedValue({
+      id: "wksp_aurora",
+      name: "Aurora",
+      slug: "aurora",
+      plan: "starter",
+      memberCount: 1,
+    }),
+    createWorkspace: vi.fn().mockResolvedValue({
+      id: "wksp_new",
+      name: "New Client",
+      slug: "new-client",
+      plan: "starter",
+      memberCount: 1,
+    }),
   },
 }));
 
@@ -31,9 +43,13 @@ import { queryPersister } from "./query-client";
  * not just the in-memory clear.
  */
 function makeWrapper() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   function Wrapper({ children }: { children: ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
   }
   return { queryClient, Wrapper };
 }
@@ -46,7 +62,9 @@ describe("clearing workspace-scoped cache on switch/create", () => {
   it("clears the in-memory query cache and removes the persisted snapshot on a successful switch", async () => {
     const { queryClient, Wrapper } = makeWrapper();
     const clearSpy = vi.spyOn(queryClient, "clear");
-    const { result } = renderHook(() => useSwitchWorkspace(), { wrapper: Wrapper });
+    const { result } = renderHook(() => useSwitchWorkspace(), {
+      wrapper: Wrapper,
+    });
 
     result.current.mutate("wksp_aurora");
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -58,7 +76,9 @@ describe("clearing workspace-scoped cache on switch/create", () => {
   it("does the same when creating a workspace, since creating also switches the session into it", async () => {
     const { queryClient, Wrapper } = makeWrapper();
     const clearSpy = vi.spyOn(queryClient, "clear");
-    const { result } = renderHook(() => useCreateWorkspace(), { wrapper: Wrapper });
+    const { result } = renderHook(() => useCreateWorkspace(), {
+      wrapper: Wrapper,
+    });
 
     result.current.mutate({ name: "New Client" });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { withTenant } from "../db.js";
 import * as dm from "../dateMath.js";
 import { computeMetric, SCALAR_METRICS, SERIES_METRICS, TABLE_METRICS } from "../metricRegistry.js";
+import { executeAdHocQuery, type AdHocQueryInput } from "../queryEngine.js";
 import { requireAuth } from "../security.js";
 
 export default async function metricsRoutes(fastify: FastifyInstance): Promise<void> {
@@ -35,4 +36,22 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
       }
     });
   });
+
+  const handleQuery = async (request: any, reply: any) => {
+    const currentUser = request.currentUser!;
+    const body = (request.body as AdHocQueryInput) ?? {};
+
+    return withTenant(currentUser.tenantId, async (client) => {
+      try {
+        const result = await executeAdHocQuery(client, currentUser.tenantId, body);
+        return reply.send(result);
+      } catch (err: any) {
+        request.log.error(err, "Failed to execute ad-hoc query");
+        return reply.code(500).send({ detail: "Query execution failed", error: err?.message });
+      }
+    });
+  };
+
+  fastify.post("/query", { preHandler: requireAuth }, handleQuery);
+  fastify.post("/metrics/query", { preHandler: requireAuth }, handleQuery);
 }

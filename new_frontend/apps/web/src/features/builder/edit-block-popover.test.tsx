@@ -3,11 +3,13 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReportBlock } from "@apicem/api-contract";
 import { renderPage } from "@/test/render";
-import { useBuilderStore } from "@/stores/builder";
+import { builderActions, store } from "@/store";
 import { EditBlockPopover } from "./edit-block-popover";
 
 function loadBlock(block: ReportBlock) {
-  useBuilderStore.getState().load("rpt_test", [block]);
+  store.dispatch(
+    builderActions.loadBuilder({ reportId: "rpt_test", blocks: [block] }),
+  );
   return block;
 }
 
@@ -27,8 +29,12 @@ describe("EditBlockPopover", () => {
     expect(screen.getByLabelText("Label")).toHaveValue("Net Revenue");
 
     await user.click(screen.getByRole("combobox"));
-    expect(await screen.findByRole("option", { name: "Net Revenue" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /Breakdown by/ })).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("option", { name: "Net Revenue" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /Breakdown by/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("switches a chart block to a different metric and saves it to the block's config", async () => {
@@ -37,7 +43,12 @@ describe("EditBlockPopover", () => {
       id: "blk_chart_1",
       type: "chart",
       layout: { x: 0, y: 0, w: 6, h: 6 },
-      config: { source: "metric", key: "met_revenue", chartType: "line", title: "Revenue" },
+      config: {
+        source: "metric",
+        key: "met_revenue",
+        chartType: "line",
+        title: "Revenue",
+      },
     });
     renderPage(<EditBlockPopover block={block} />);
 
@@ -50,7 +61,10 @@ describe("EditBlockPopover", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(useBuilderStore.getState().blocks[0].config).toMatchObject({ source: "metric", key: "met_margin" });
+      expect(store.getState().builder.blocks[0].config).toMatchObject({
+        source: "metric",
+        key: "met_margin",
+      });
     });
   });
 
@@ -72,7 +86,10 @@ describe("EditBlockPopover", () => {
     // through the mock query engine (simulated latency and all) — the click
     // above only awaits its own dispatch, not that request finishing.
     await waitFor(() => {
-      expect(useBuilderStore.getState().blocks[0].config).toMatchObject({ source: "preset", key: "cac_channel" });
+      expect(store.getState().builder.blocks[0].config).toMatchObject({
+        source: "preset",
+        key: "cac_channel",
+      });
     });
   });
 
@@ -82,7 +99,12 @@ describe("EditBlockPopover", () => {
       id: "blk_chart_2",
       type: "chart",
       layout: { x: 0, y: 0, w: 6, h: 6 },
-      config: { source: "metric", key: "met_revenue", chartType: "bar", title: "Revenue" },
+      config: {
+        source: "metric",
+        key: "met_revenue",
+        chartType: "bar",
+        title: "Revenue",
+      },
     });
     renderPage(<EditBlockPopover block={block} />);
 
@@ -94,7 +116,7 @@ describe("EditBlockPopover", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(useBuilderStore.getState().blocks[0].config).toMatchObject({
+      expect(store.getState().builder.blocks[0].config).toMatchObject({
         source: "preset",
         key: "bydim:met_revenue,met_margin:channel",
       });
@@ -107,7 +129,12 @@ describe("EditBlockPopover", () => {
       id: "blk_chart_3",
       type: "chart",
       layout: { x: 0, y: 0, w: 6, h: 6 },
-      config: { source: "metric", key: "met_revenue", chartType: "bar", title: "Revenue" },
+      config: {
+        source: "metric",
+        key: "met_revenue",
+        chartType: "bar",
+        title: "Revenue",
+      },
     });
     renderPage(<EditBlockPopover block={block} />);
 
@@ -118,7 +145,7 @@ describe("EditBlockPopover", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(useBuilderStore.getState().blocks[0].config).toMatchObject({
+      expect(store.getState().builder.blocks[0].config).toMatchObject({
         source: "preset",
         key: "crosstab:met_revenue,met_margin:channel,category",
       });
@@ -131,7 +158,12 @@ describe("EditBlockPopover", () => {
       id: "blk_chart_4",
       type: "chart",
       layout: { x: 0, y: 0, w: 6, h: 6 },
-      config: { source: "metric", key: "met_revenue", chartType: "bar", title: "Revenue" },
+      config: {
+        source: "metric",
+        key: "met_revenue",
+        chartType: "bar",
+        title: "Revenue",
+      },
     });
     renderPage(<EditBlockPopover block={block} />);
 
@@ -151,7 +183,7 @@ describe("EditBlockPopover", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(useBuilderStore.getState().blocks[0].config).toMatchObject({
+      expect(store.getState().builder.blocks[0].config).toMatchObject({
         source: "preset",
         key: "crosstab:met_revenue,met_margin,met_cac,met_ltv,met_roas,met_repeat_rate,met_aov:channel,category,product",
       });

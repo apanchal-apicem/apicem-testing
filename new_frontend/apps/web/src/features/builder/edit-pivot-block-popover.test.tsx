@@ -3,11 +3,13 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReportBlock } from "@apicem/api-contract";
 import { renderPage } from "@/test/render";
-import { useBuilderStore } from "@/stores/builder";
+import { builderActions, store } from "@/store";
 import { EditPivotBlockPopover } from "./edit-pivot-block-popover";
 
 function loadBlock(block: ReportBlock) {
-  useBuilderStore.getState().load("rpt_test", [block]);
+  store.dispatch(
+    builderActions.loadBuilder({ reportId: "rpt_test", blocks: [block] }),
+  );
   return block;
 }
 
@@ -18,7 +20,12 @@ describe("EditPivotBlockPopover", () => {
       id: "blk_pivot_1",
       type: "pivot",
       layout: { x: 0, y: 0, w: 8, h: 10 },
-      config: { metricIds: ["met_revenue"], rowDimensions: ["channel"], columnDimensions: [], title: "Revenue by channel" },
+      config: {
+        metricIds: ["met_revenue"],
+        rowDimensions: ["channel"],
+        columnDimensions: [],
+        title: "Revenue by channel",
+      },
     });
     renderPage(<EditPivotBlockPopover block={block} />);
 
@@ -28,7 +35,9 @@ describe("EditPivotBlockPopover", () => {
     expect(screen.getByLabelText("Net Revenue")).toBeChecked();
     // "Channel" appears in both the Rows and Columns toggle groups — Rows
     // renders first, and it's the one seeded active from rowDimensions.
-    expect(screen.getAllByRole("button", { name: "Channel" })[0]).toHaveClass("border-accent");
+    expect(screen.getAllByRole("button", { name: "Channel" })[0]).toHaveClass(
+      "border-accent",
+    );
   });
 
   it("adds a second metric and a Columns dimension, saving straight to config with no query-engine resolution step", async () => {
@@ -37,7 +46,11 @@ describe("EditPivotBlockPopover", () => {
       id: "blk_pivot_2",
       type: "pivot",
       layout: { x: 0, y: 0, w: 8, h: 10 },
-      config: { metricIds: ["met_revenue"], rowDimensions: ["channel"], columnDimensions: [] },
+      config: {
+        metricIds: ["met_revenue"],
+        rowDimensions: ["channel"],
+        columnDimensions: [],
+      },
     });
     renderPage(<EditPivotBlockPopover block={block} />);
 
@@ -49,7 +62,7 @@ describe("EditPivotBlockPopover", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(useBuilderStore.getState().blocks[0].config).toMatchObject({
+      expect(store.getState().builder.blocks[0].config).toMatchObject({
         metricIds: ["met_revenue", "met_margin"],
         rowDimensions: ["channel"],
       });

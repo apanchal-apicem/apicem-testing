@@ -1,14 +1,24 @@
 import { useEffect, useState } from "react";
 import { Settings2 } from "lucide-react";
 import type { ChartType, ReportBlock } from "@apicem/api-contract";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ChartTypeSwitcher } from "@/features/explorer/chart-type-switcher";
 import { STANDARD_DIMENSIONS } from "@/features/explorer/standard-dimensions";
 import { useBlockData, useMetrics, useRunQuery } from "@/api/hooks";
-import { useBuilderStore } from "@/stores/builder";
+import { builderActions, useAppDispatch } from "@/store";
 import { resolveKey } from "./resolve-key";
 import { cn } from "@/lib/utils";
 
@@ -25,10 +35,14 @@ const DIMENSION_PREFIX = "dimension:";
  * case is left undecoded — same limitation "Currently: <summary>" already
  * covers below.
  */
-function decodeSelection(ref: { source: "metric" | "preset"; key: string } | null): { metricIds: string[]; dimensionIds: string[] } {
+function decodeSelection(
+  ref: { source: "metric" | "preset"; key: string } | null,
+): { metricIds: string[]; dimensionIds: string[] } {
   if (!ref) return { metricIds: [], dimensionIds: [] };
-  if (ref.source === "metric") return { metricIds: [ref.key], dimensionIds: [] };
-  if (ref.key.startsWith("multi:")) return { metricIds: ref.key.slice(6).split(","), dimensionIds: [] };
+  if (ref.source === "metric")
+    return { metricIds: [ref.key], dimensionIds: [] };
+  if (ref.key.startsWith("multi:"))
+    return { metricIds: ref.key.slice(6).split(","), dimensionIds: [] };
   if (ref.key.startsWith("bydim:")) {
     const [idsPart, dim] = ref.key.slice(6).split(":");
     return { metricIds: idsPart.split(","), dimensionIds: [dim] };
@@ -50,14 +64,18 @@ function decodeSelection(ref: { source: "metric" | "preset"; key: string } | nul
 export function EditBlockPopover({ block }: { block: ReportBlock }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const updateBlock = useBuilderStore((s) => s.updateBlock);
+  const dispatch = useAppDispatch();
   const { data: metrics = [] } = useMetrics();
   const runQuery = useRunQuery();
 
   const currentRef = resolveKey(block.config);
   const { data: current } = useBlockData(currentRef?.source, currentRef?.key);
 
-  const config = block.config as { title?: string; label?: string; chartType?: ChartType };
+  const config = block.config as {
+    title?: string;
+    label?: string;
+    chartType?: ChartType;
+  };
   const [title, setTitle] = useState("");
   const [chartType, setChartType] = useState<ChartType>("line");
   const [choice, setChoice] = useState("");
@@ -65,10 +83,14 @@ export function EditBlockPopover({ block }: { block: ReportBlock }) {
   const [dimensionIds, setDimensionIds] = useState<string[]>([]);
 
   function toggleMetric(id: string) {
-    setMetricIds((prev) => (prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]));
+    setMetricIds((prev) =>
+      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id],
+    );
   }
   function toggleDimension(id: string) {
-    setDimensionIds((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
+    setDimensionIds((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id],
+    );
   }
 
   // Re-seeds the draft from the block's actual current values each time the
@@ -84,7 +106,11 @@ export function EditBlockPopover({ block }: { block: ReportBlock }) {
     // alone (see dimensionPresetKeys' workspace-by-workspace mapping in
     // mock/fixtures.ts). "Currently: <summary>" below covers that case
     // instead of a wrong guess.
-    setChoice(currentRef?.source === "metric" ? `${METRIC_PREFIX}${currentRef.key}` : "");
+    setChoice(
+      currentRef?.source === "metric"
+        ? `${METRIC_PREFIX}${currentRef.key}`
+        : "",
+    );
     const decoded = decodeSelection(currentRef);
     setMetricIds(decoded.metricIds);
     setDimensionIds(decoded.dimensionIds);
@@ -103,7 +129,9 @@ export function EditBlockPopover({ block }: { block: ReportBlock }) {
           key = choice.slice(METRIC_PREFIX.length);
         } else {
           const dimensionId = choice.slice(DIMENSION_PREFIX.length);
-          const result = await runQuery.mutateAsync({ dimensions: [dimensionId] });
+          const result = await runQuery.mutateAsync({
+            dimensions: [dimensionId],
+          });
           if (!result.resolvedKey) return;
           source = "preset";
           key = result.resolvedKey;
@@ -115,21 +143,31 @@ export function EditBlockPopover({ block }: { block: ReportBlock }) {
           dimensions: dimensionIds.length > 0 ? dimensionIds : undefined,
         });
         if (!result.resolvedKey) return;
-        source = metrics.some((m) => m.id === result.resolvedKey) ? "metric" : "preset";
+        source = metrics.some((m) => m.id === result.resolvedKey)
+          ? "metric"
+          : "preset";
         key = result.resolvedKey;
       }
-      updateBlock(block.id, (b) =>
-        b.type === "kpi"
-          ? { ...b, config: { source, key, label: title || undefined } }
-          : { ...b, config: { source, key, title, ...(b.type === "chart" ? { chartType } : {}) } },
-      );
+      const config =
+        block.type === "kpi"
+          ? { source, key, label: title || undefined }
+          : {
+              source,
+              key,
+              title,
+              ...(block.type === "chart" ? { chartType } : {}),
+            };
+      dispatch(builderActions.updateBlock({ id: block.id, patch: { config } }));
       setOpen(false);
     } finally {
       setSaving(false);
     }
   }
 
-  const canSave = block.type === "kpi" ? Boolean(choice) : metricIds.length > 0 || dimensionIds.length > 0;
+  const canSave =
+    block.type === "kpi"
+      ? Boolean(choice)
+      : metricIds.length > 0 || dimensionIds.length > 0;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -142,9 +180,19 @@ export function EditBlockPopover({ block }: { block: ReportBlock }) {
           <Settings2 className="size-3" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72" onPointerDown={(e) => e.stopPropagation()}>
-        <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">Edit {block.type}</p>
-        {current && <p className="mb-3 text-[12px] text-ink-soft">Currently: {current.summary}</p>}
+      <PopoverContent
+        align="end"
+        className="w-72"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-wide text-ink-faint">
+          Edit {block.type}
+        </p>
+        {current && (
+          <p className="mb-3 text-[12px] text-ink-soft">
+            Currently: {current.summary}
+          </p>
+        )}
 
         <div className="space-y-3">
           {block.type === "kpi" ? (
@@ -166,18 +214,30 @@ export function EditBlockPopover({ block }: { block: ReportBlock }) {
           ) : (
             <>
               <div>
-                <p className="mb-1.5 text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">Metrics</p>
+                <p className="mb-1.5 text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">
+                  Metrics
+                </p>
                 <div className="scrollbar-thin max-h-36 space-y-1 overflow-y-auto rounded-(--radius-sm) border border-border p-2">
                   {metrics.map((m) => (
-                    <label key={m.id} className="flex cursor-pointer items-center gap-2 rounded-(--radius-sm) px-1.5 py-1 text-[13px] text-ink hover:bg-surface-2">
-                      <input type="checkbox" checked={metricIds.includes(m.id)} onChange={() => toggleMetric(m.id)} className="size-3.5 accent-accent" />
+                    <label
+                      key={m.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-(--radius-sm) px-1.5 py-1 text-[13px] text-ink hover:bg-surface-2"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={metricIds.includes(m.id)}
+                        onChange={() => toggleMetric(m.id)}
+                        className="size-3.5 accent-accent"
+                      />
                       {m.name}
                     </label>
                   ))}
                 </div>
               </div>
               <div>
-                <p className="mb-1.5 text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">Breakdown by</p>
+                <p className="mb-1.5 text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">
+                  Breakdown by
+                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {STANDARD_DIMENSIONS.map((d) => (
                     <button
@@ -200,18 +260,32 @@ export function EditBlockPopover({ block }: { block: ReportBlock }) {
           )}
 
           <div>
-            <Label htmlFor={`block-title-${block.id}`}>{block.type === "kpi" ? "Label" : "Title"}</Label>
-            <Input id={`block-title-${block.id}`} value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Label htmlFor={`block-title-${block.id}`}>
+              {block.type === "kpi" ? "Label" : "Title"}
+            </Label>
+            <Input
+              id={`block-title-${block.id}`}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
           </div>
 
           {block.type === "chart" && (
             <div>
-              <p className="mb-1.5 text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">Chart type</p>
+              <p className="mb-1.5 text-[12.5px] font-medium tracking-wide text-ink-soft uppercase">
+                Chart type
+              </p>
               <ChartTypeSwitcher value={chartType} onChange={setChartType} />
             </div>
           )}
 
-          <Button size="sm" className="w-full" onClick={save} loading={saving} disabled={!canSave}>
+          <Button
+            size="sm"
+            className="w-full"
+            onClick={save}
+            loading={saving}
+            disabled={!canSave}
+          >
             Save
           </Button>
         </div>

@@ -41,7 +41,11 @@ export type PgClient = pg.PoolClient;
  * verified JWT (see security.ts), never from client-supplied input -- same invariant the
  * Python backend's get_tenant_db() enforced by construction.
  */
-export async function withTenant<T>(tenantId: string, fn: (client: PgClient) => Promise<T>): Promise<T> {
+export async function withTenant<T>(
+  tenantId: string,
+  fn: (client: PgClient) => Promise<T>,
+  userId?: string,
+): Promise<T> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -52,6 +56,9 @@ export async function withTenant<T>(tenantId: string, fn: (client: PgClient) => 
     // (which would otherwise need its own UUID-shape validation to stay injection-safe).
     // is_local=true makes this scoped to the current transaction, same as SET LOCAL.
     await client.query("SELECT set_config('app.current_tenant', $1, true)", [tenantId]);
+    if (userId) {
+      await client.query("SELECT set_config('app.current_user_id', $1, true)", [userId]);
+    }
     const result = await fn(client);
     await client.query("COMMIT");
     return result;

@@ -12,16 +12,36 @@ import { Button } from "@/components/ui/button";
 import { Canvas } from "@/features/builder/canvas";
 import { StaticCanvas } from "@/features/builder/static-canvas";
 import { BlockPalette } from "@/features/builder/block-palette";
-import { GRID_COLS, GAP, ROW_HEIGHT, defaultSizeByType, snapToGrid } from "@/features/builder/grid-utils";
-import { useBuilderStore } from "@/stores/builder";
-import { useReport, useRecordWorkbookViewOnce, useUpdateReport } from "@/api/hooks";
+import {
+  GRID_COLS,
+  GAP,
+  ROW_HEIGHT,
+  defaultSizeByType,
+  snapToGrid,
+} from "@/features/builder/grid-utils";
+import { builderActions, useAppDispatch, useAppSelector } from "@/store";
+import {
+  useReport,
+  useRecordWorkbookViewOnce,
+  useUpdateReport,
+} from "@/api/hooks";
 import type { ReportBlock, ReportBlockType } from "@apicem/api-contract";
 
 const defaultConfigByType: Record<ReportBlockType, Record<string, unknown>> = {
   kpi: { metricId: "met_revenue", label: "Net Revenue", delta: 4.2 },
-  chart: { source: "metric", key: "met_revenue", chartType: "line", title: "New chart" },
+  chart: {
+    source: "metric",
+    key: "met_revenue",
+    chartType: "line",
+    title: "New chart",
+  },
   table: { source: "preset", key: "top_products", title: "New table" },
-  pivot: { metricIds: ["met_revenue"], rowDimensions: ["channel"], columnDimensions: [], title: "New pivot table" },
+  pivot: {
+    metricIds: ["met_revenue"],
+    rowDimensions: ["channel"],
+    columnDimensions: [],
+    title: "New pivot table",
+  },
   text: { title: "Note", body: "Write something the numbers alone don't say." },
   divider: {},
   image: {},
@@ -35,15 +55,22 @@ export function ReportBuilderPage() {
   // Opening the builder is also "viewing" the report, same reasoning as
   // ReportViewPage's identical call.
   useRecordWorkbookViewOnce(reportId);
-  const { blocks, load, addBlock, dirty, markSaved } = useBuilderStore();
+  const dispatch = useAppDispatch();
+  const { blocks, dirty } = useAppSelector((state) => state.builder);
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [colWidth, setColWidth] = useState(80);
   const [previewMode, setPreviewMode] = useState(false);
 
   useEffect(() => {
-    if (report) load(report.id, report.blocks);
-  }, [report, load]);
+    if (report)
+      dispatch(
+        builderActions.loadBuilder({
+          reportId: report.id,
+          blocks: report.blocks,
+        }),
+      );
+  }, [report, dispatch]);
 
   useEffect(() => {
     const el = canvasRef.current;
@@ -59,11 +86,15 @@ export function ReportBuilderPage() {
     // re-attach rather than keep watching a node that's no longer mounted.
   }, [report, previewMode]);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, delta } = event;
-    const data = active.data.current as { kind: "existing" | "palette"; blockType?: ReportBlockType } | undefined;
+    const data = active.data.current as
+      | { kind: "existing" | "palette"; blockType?: ReportBlockType }
+      | undefined;
 
     if (data?.kind === "palette" && data.blockType) {
       const rect = canvasRef.current?.getBoundingClientRect();
@@ -75,10 +106,14 @@ export function ReportBuilderPage() {
       const block: ReportBlock = {
         id: `blk_${Math.random().toString(36).slice(2, 9)}`,
         type: data.blockType,
-        layout: { x: Math.max(0, Math.min(GRID_COLS - size.w, x)), y: Math.max(0, y), ...size },
+        layout: {
+          x: Math.max(0, Math.min(GRID_COLS - size.w, x)),
+          y: Math.max(0, y),
+          ...size,
+        },
         config: defaultConfigByType[data.blockType],
       };
-      addBlock(block);
+      dispatch(builderActions.addBlock(block));
       return;
     }
 
@@ -87,16 +122,24 @@ export function ReportBuilderPage() {
     const pxLeft = block.layout.x * (colWidth + GAP) + delta.x;
     const pxTop = block.layout.y * (ROW_HEIGHT + GAP) + delta.y;
     const { x, y } = snapToGrid(pxLeft, pxTop, colWidth);
-    useBuilderStore.getState().updateBlock(block.id, (b) => ({
-      ...b,
-      layout: { ...b.layout, x: Math.max(0, Math.min(GRID_COLS - b.layout.w, x)), y: Math.max(0, y) },
-    }));
+    dispatch(
+      builderActions.updateBlock({
+        id: block.id,
+        patch: {
+          layout: {
+            ...block.layout,
+            x: Math.max(0, Math.min(GRID_COLS - block.layout.w, x)),
+            y: Math.max(0, y),
+          },
+        },
+      }),
+    );
   }
 
   async function handleSave() {
     if (!reportId) return;
     await updateReport.mutateAsync({ blocks });
-    markSaved();
+    dispatch(builderActions.markBuilderSaved());
   }
 
   if (isLoading || !report) {
@@ -120,7 +163,9 @@ export function ReportBuilderPage() {
             <ArrowLeft className="size-4" />
           </button>
           <div className="min-w-0">
-            <p className="truncate font-display text-[14.5px] font-semibold text-ink">{report.name}</p>
+            <p className="truncate font-display text-[14.5px] font-semibold text-ink">
+              {report.name}
+            </p>
             {/* <output>'s implicit status role (aria-live="polite") announces
                 the save state change to a screen reader without needing
                 focus to be on this text — otherwise a save happening while
@@ -131,11 +176,26 @@ export function ReportBuilderPage() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPreviewMode((p) => !p)}>
-            {previewMode ? <Pencil className="size-3.5" /> : <Eye className="size-3.5" />}
-            <span className="hidden sm:inline">{previewMode ? "Edit" : "Preview"}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPreviewMode((p) => !p)}
+          >
+            {previewMode ? (
+              <Pencil className="size-3.5" />
+            ) : (
+              <Eye className="size-3.5" />
+            )}
+            <span className="hidden sm:inline">
+              {previewMode ? "Edit" : "Preview"}
+            </span>
           </Button>
-          <Button size="sm" onClick={handleSave} loading={updateReport.isPending} disabled={!dirty}>
+          <Button
+            size="sm"
+            onClick={handleSave}
+            loading={updateReport.isPending}
+            disabled={!dirty}
+          >
             <Check className="size-3.5" />
             <span className="hidden sm:inline">Save</span>
           </Button>
@@ -150,16 +210,23 @@ export function ReportBuilderPage() {
         ) : (
           <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
             <Canvas ref={canvasRef} blocks={blocks} colWidth={colWidth} />
-            <BlockPalette onAdd={(type) => {
-              const size = defaultSizeByType[type];
-              const maxY = blocks.reduce((acc, b) => Math.max(acc, b.layout.y + b.layout.h), 0);
-              addBlock({
-                id: `blk_${Math.random().toString(36).slice(2, 9)}`,
-                type,
-                layout: { x: 0, y: maxY, ...size },
-                config: defaultConfigByType[type],
-              });
-            }} />
+            <BlockPalette
+              onAdd={(type) => {
+                const size = defaultSizeByType[type];
+                const maxY = blocks.reduce(
+                  (acc, b) => Math.max(acc, b.layout.y + b.layout.h),
+                  0,
+                );
+                dispatch(
+                  builderActions.addBlock({
+                    id: `blk_${Math.random().toString(36).slice(2, 9)}`,
+                    type,
+                    layout: { x: 0, y: maxY, ...size },
+                    config: defaultConfigByType[type],
+                  }),
+                );
+              }}
+            />
           </DndContext>
         )}
       </div>

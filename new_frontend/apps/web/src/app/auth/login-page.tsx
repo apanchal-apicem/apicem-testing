@@ -4,25 +4,32 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { BrandMark, ProductLabel } from "@/components/layout/brand-mark";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { useAuthStore } from "@/stores/auth";
+import { apiClient, isMockMode } from "@/api/client";
+import { signIn, signUp, useAppDispatch, useAppSelector } from "@/store";
 
 const SEEDED_EMAIL = "jordan@apicemengine.com";
 
-type Mode = "signin" | "forgot" | "sent";
+type Mode = "signin" | "signup" | "forgot" | "sent";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const signIn = useAuthStore((s) => s.signIn);
+  const dispatch = useAppDispatch();
+  const authStatus = useAppSelector((state) => state.auth.status);
   const [mode, setMode] = useState<Mode>("signin");
-  const [resetEmail, setResetEmail] = useState(SEEDED_EMAIL);
+  const initialEmail = isMockMode ? SEEDED_EMAIL : "";
+  const [resetEmail, setResetEmail] = useState(initialEmail);
+  const [companyName, setCompanyName] = useState("");
+  const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Otherwise the browser's back button (or a stale bookmark, or the /login
   // history entry sign-in itself just pushed) can land a still-signed-in
   // user right back on this form — AppShell only guards the other
   // direction (signed out -> kicked to /login), so this route has to guard
   // itself rather than rely on how it was reached.
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  if (authStatus === "authenticated") return <Navigate to="/" replace />;
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-6 py-12">
@@ -36,65 +43,167 @@ export function LoginPage() {
           <ProductLabel className="mb-4 mt-2 text-[11.5px] tracking-[0.14em] text-accent-ink" />
           {mode === "signin" && (
             <>
-              <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">Sign in to your workspace</h1>
-              <p className="mt-1.5 text-[13.5px] text-ink-soft">Your workspace is waiting on the other side.</p>
+              <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">
+                Sign in to your workspace
+              </h1>
+              <p className="mt-1.5 text-[13.5px] text-ink-soft">
+                Your workspace is waiting on the other side.
+              </p>
+            </>
+          )}
+          {mode === "signup" && (
+            <>
+              <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">
+                Create your workspace
+              </h1>
+              <p className="mt-1.5 text-[13.5px] text-ink-soft">
+                Set up your workspace to get started.
+              </p>
             </>
           )}
           {mode === "forgot" && (
             <>
-              <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">Reset your password</h1>
-              <p className="mt-1.5 text-[13.5px] text-ink-soft">Enter your work email and we'll send you a reset link.</p>
+              <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">
+                Reset your password
+              </h1>
+              <p className="mt-1.5 text-[13.5px] text-ink-soft">
+                Enter your work email and we'll send you a reset link.
+              </p>
             </>
           )}
           {mode === "sent" && (
             <>
-              <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">Check your email</h1>
+              <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">
+                Check your email
+              </h1>
               <p className="mt-1.5 text-[13.5px] text-ink-soft">
-                If an account exists for <span className="font-medium text-ink">{resetEmail}</span>, a reset link is on its
-                way.
+                If an account exists for{" "}
+                <span className="font-medium text-ink">{resetEmail}</span>, a
+                reset link is on its way.
               </p>
             </>
           )}
         </div>
 
-        {mode === "signin" && (
+        {(mode === "signin" || mode === "signup") && (
           <form
             className="space-y-4 rounded-(--radius-lg) border border-border bg-surface p-6"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              signIn();
-              navigate("/", { replace: true });
+              setError("");
+              setIsSubmitting(true);
+              try {
+                if (mode === "signup") {
+                  await dispatch(
+                    signUp({ companyName, email, password }),
+                  ).unwrap();
+                  navigate("/onboarding", { replace: true });
+                } else {
+                  await dispatch(signIn({ email, password })).unwrap();
+                  navigate("/", { replace: true });
+                }
+              } catch (submitError) {
+                const message =
+                  submitError &&
+                  typeof submitError === "object" &&
+                  "message" in submitError &&
+                  typeof submitError.message === "string"
+                    ? submitError.message
+                    : "Unable to complete your request.";
+                setError(message);
+              } finally {
+                setIsSubmitting(false);
+              }
             }}
           >
+            {mode === "signup" && (
+              <div>
+                <Label htmlFor="company-name">Workspace name</Label>
+                <Input
+                  id="company-name"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  required
+                />
+              </div>
+            )}
             <div>
               <Label htmlFor="email">Work email</Label>
-              <Input id="email" type="email" defaultValue={SEEDED_EMAIL} required />
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
             </div>
             <div>
               <div className="flex items-baseline justify-between">
                 <Label htmlFor="password">Password</Label>
-                <button
-                  type="button"
-                  onClick={() => setMode("forgot")}
-                  className="text-[12.5px] font-medium text-accent-ink hover:underline"
-                >
-                  Forgot password?
-                </button>
+                {mode === "signin" && (
+                  <button
+                    type="button"
+                    onClick={() => setMode("forgot")}
+                    className="text-[12.5px] font-medium text-accent-ink hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                )}
               </div>
-              <Input id="password" type="password" defaultValue="••••••••••" required />
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
             </div>
-            <Button type="submit" withArrow className="mt-2 w-full">
-              Sign in
+            {error && (
+              <p role="alert" className="text-[12.5px] text-danger">
+                {error}
+              </p>
+            )}
+            <Button
+              type="submit"
+              withArrow
+              className="mt-2 w-full"
+              loading={isSubmitting}
+            >
+              {mode === "signup" ? "Create account" : "Sign in"}
             </Button>
           </form>
+        )}
+
+        {(mode === "signin" || mode === "signup") && (
+          <button
+            type="button"
+            onClick={() => {
+              setError("");
+              setMode(mode === "signup" ? "signin" : "signup");
+            }}
+            className="mt-4 w-full text-center text-[12.5px] font-medium text-accent-ink hover:underline"
+          >
+            {mode === "signup"
+              ? "Already have an account? Sign in"
+              : "Create an account"}
+          </button>
         )}
 
         {mode === "forgot" && (
           <form
             className="space-y-4 rounded-(--radius-lg) border border-border bg-surface p-6"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              setMode("sent");
+              setError("");
+              setIsSubmitting(true);
+              try {
+                await apiClient.requestPasswordReset(resetEmail);
+                setMode("sent");
+              } catch {
+                setError("Could not send a reset request. Please try again.");
+              } finally {
+                setIsSubmitting(false);
+              }
             }}
           >
             <div>
@@ -107,7 +216,17 @@ export function LoginPage() {
                 required
               />
             </div>
-            <Button type="submit" withArrow className="mt-2 w-full">
+            {error && (
+              <p role="alert" className="text-[12.5px] text-danger">
+                {error}
+              </p>
+            )}
+            <Button
+              type="submit"
+              withArrow
+              className="mt-2 w-full"
+              loading={isSubmitting}
+            >
               Send reset link
             </Button>
             <button
@@ -122,14 +241,22 @@ export function LoginPage() {
 
         {mode === "sent" && (
           <div className="rounded-(--radius-lg) border border-border bg-surface p-6">
-            <Button type="button" className="w-full" onClick={() => setMode("signin")}>
+            <Button
+              type="button"
+              className="w-full"
+              onClick={() => setMode("signin")}
+            >
               Back to sign in
             </Button>
           </div>
         )}
 
         <p className="mt-6 text-center text-[12.5px] text-ink-faint">
-          This is a demo workspace running on fixture data; no real credentials required.
+          {isMockMode
+            ? "Demo mode uses fixture data; any sign-in credentials work."
+            : mode === "signup"
+              ? "Your password is protected by your Apicem session."
+              : "Sign in to your Apicem workspace."}
         </p>
       </div>
     </div>

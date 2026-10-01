@@ -16,7 +16,12 @@ export interface CurrentUser {
   isDemo: boolean;
 }
 
-export const ROLE_RANK: Record<string, number> = { viewer: 1, admin: 2, owner: 3 };
+export const ROLE_RANK: Record<string, number> = {
+  viewer: 1,
+  editor: 1,
+  admin: 2,
+  owner: 3,
+};
 
 const BCRYPT_ROUNDS = 12;
 
@@ -24,7 +29,10 @@ export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_ROUNDS);
 }
 
-export async function verifyPassword(password: string, hashed: string): Promise<boolean> {
+export async function verifyPassword(
+  password: string,
+  hashed: string,
+): Promise<boolean> {
   return bcrypt.compare(password, hashed);
 }
 
@@ -35,8 +43,18 @@ interface AccessTokenPayload {
   is_demo: boolean;
 }
 
-export function createAccessToken(userId: string, tenantId: string, role: string, isDemo = false): string {
-  const payload: AccessTokenPayload = { sub: userId, tenant_id: tenantId, role, is_demo: isDemo };
+export function createAccessToken(
+  userId: string,
+  tenantId: string,
+  role: string,
+  isDemo = false,
+): string {
+  const payload: AccessTokenPayload = {
+    sub: userId,
+    tenant_id: tenantId,
+    role,
+    is_demo: isDemo,
+  };
   return jwt.sign(payload, settings.jwtSecret, {
     algorithm: settings.jwtAlgorithm,
     expiresIn: `${settings.jwtExpiresMinutes}m`,
@@ -49,7 +67,10 @@ interface PasswordResetTokenPayload {
 }
 
 export function createPasswordResetToken(userId: string): string {
-  const payload: PasswordResetTokenPayload = { sub: userId, purpose: "password_reset" };
+  const payload: PasswordResetTokenPayload = {
+    sub: userId,
+    purpose: "password_reset",
+  };
   return jwt.sign(payload, settings.jwtSecret, {
     algorithm: settings.jwtAlgorithm,
     expiresIn: `${settings.passwordResetTokenExpiresMinutes}m`,
@@ -65,7 +86,9 @@ export class InvalidResetLinkError extends Error {}
 export function verifyPasswordResetToken(token: string): string {
   let decoded: unknown;
   try {
-    decoded = jwt.verify(token, settings.jwtSecret, { algorithms: [settings.jwtAlgorithm] });
+    decoded = jwt.verify(token, settings.jwtSecret, {
+      algorithms: [settings.jwtAlgorithm],
+    });
   } catch {
     throw new InvalidResetLinkError("Invalid or expired reset link");
   }
@@ -79,6 +102,22 @@ export function verifyPasswordResetToken(token: string): string {
   return payload.sub;
 }
 
+export const SESSION_COOKIE_NAME = "apicem_session";
+
+export function setSessionCookie(reply: FastifyReply, token: string): void {
+  reply.setCookie(SESSION_COOKIE_NAME, token, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: settings.cookieSecure,
+    maxAge: settings.jwtExpiresMinutes * 60,
+  });
+}
+
+export function clearSessionCookie(reply: FastifyReply): void {
+  reply.clearCookie(SESSION_COOKIE_NAME, { path: "/" });
+}
+
 declare module "fastify" {
   interface FastifyRequest {
     currentUser?: CurrentUser;
@@ -86,22 +125,40 @@ declare module "fastify" {
 }
 
 /**
- * Fastify preHandler decoding the bearer JWT. Explicitly rejects a token missing
- * tenant_id/role (e.g. a password-reset token used where an access token was expected)
- * rather than crashing on undefined access downstream -- same guard get_current_user() has.
+ * Fastify preHandler decoding the session cookie or bearer JWT.
+ * Checks request.cookies.apicem_session first, falls back to Authorization: Bearer <token>.
+ * Explicitly rejects a token missing tenant_id/role.
  */
-export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const authHeader = request.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
+export async function requireAuth(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const cookieToken = request.cookies?.[SESSION_COOKIE_NAME];
+  let token = cookieToken;
+  if (!token) {
+    const authHeader = request.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      token = authHeader.slice("Bearer ".length);
+    }
+  }
+
+  if (!token) {
     reply.code(401).send({ detail: "Not authenticated" });
     return reply as never;
   }
-  const token = authHeader.slice("Bearer ".length);
+
   try {
-    const decoded = jwt.verify(token, settings.jwtSecret, { algorithms: [settings.jwtAlgorithm] });
-    if (typeof decoded !== "object" || decoded === null) throw new Error("malformed payload");
+    const decoded = jwt.verify(token, settings.jwtSecret, {
+      algorithms: [settings.jwtAlgorithm],
+    });
+    if (typeof decoded !== "object" || decoded === null)
+      throw new Error("malformed payload");
     const payload = decoded as Record<string, unknown>;
-    if (typeof payload.sub !== "string" || typeof payload.tenant_id !== "string" || typeof payload.role !== "string") {
+    if (
+      typeof payload.sub !== "string" ||
+      typeof payload.tenant_id !== "string" ||
+      typeof payload.role !== "string"
+    ) {
       reply.code(401).send({ detail: "Invalid or expired token" });
       return reply as never;
     }
@@ -120,7 +177,10 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
 /** Fastify preHandler factory: 403s if the current user's role isn't in `roles`. Must run
  * AFTER requireAuth (relies on request.currentUser being populated already). */
 export function requireRole(...roles: string[]) {
-  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  return async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<void> => {
     if (!request.currentUser || !roles.includes(request.currentUser.role)) {
       reply.code(403).send({ detail: "Insufficient role" });
       return reply as never;
